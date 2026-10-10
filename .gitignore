@@ -1,0 +1,17 @@
+/devpost/learner-profile.md
+.env
+.env.*
+!.env.example
+
+# Bill Splitter
+bill-splitter/.venv/
+bill-splitter/data/*
+!bill-splitter/data/.gitkeep
+bill-splitter/secrets/
+*service-account*.json
+*-key.json
+bill-splitter/backend/fixtures/*.json
+!bill-splitter/backend/fixtures/sample.json
+__pycache__/
+.pytest_cache/
+.DS_Store

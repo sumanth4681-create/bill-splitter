@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bill Splitter Scope</title>
+<style>
+  :root {
+    --bg: #f7f6f2; --card: #ffffff; --ink: #1d1d1b; --muted: #5f5e58;
+    --line: #dedcd3; --accent: #1f6f5c; --accent-soft: #e3f1ec;
+    --later: #8a5a00; --later-soft: #fbf0d9; --cut: #a33b2f; --cut-soft: #f8e3df;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161614; --card: #201f1c; --ink: #ecebe5; --muted: #a8a69d;
+      --line: #36342f; --accent: #5cc4a6; --accent-soft: #1d3530;
+      --later: #e0b45c; --later-soft: #3a2f17; --cut: #e8806f; --cut-soft: #3d221d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 820px; margin: 0 auto; padding: 32px 16px 64px; }
+  .eyebrow { color: var(--muted); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
+  h1 { font-size: 32px; line-height: 1.2; margin: 4px 0 8px; }
+  .lede { color: var(--muted); font-size: 18px; margin: 0 0 28px; }
+  .badge { display: inline-block; font-size: 12px; padding: 2px 10px; border-radius: 99px;
+    background: var(--later-soft); color: var(--later); font-weight: 600; vertical-align: middle; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 20px 22px; margin: 16px 0; }
+  h2 { font-size: 18px; margin: 0 0 8px; }
+  p { margin: 6px 0; }
+  .kernel { border-left: 4px solid var(--accent); background: var(--accent-soft); }
+  svg { width: 100%; height: auto; display: block; }
+  .flow-text { color: var(--muted); font-size: 14px; }
+  .step-controls { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+  button { font: inherit; font-size: 14px; padding: 6px 14px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  .step-text { font-size: 15px; flex: 1 1 260px; }
+  details { border: 1px solid var(--line); border-radius: 10px; margin: 10px 0; overflow: hidden; }
+  summary { cursor: pointer; padding: 12px 16px; font-weight: 600; list-style: none; display: flex; gap: 10px; align-items: center; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; margin-left: auto; color: var(--muted); }
+  details[open] summary::after { content: "–"; }
+  details ul { margin: 0; padding: 0 20px 14px 38px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .now .dot { background: var(--accent); } .later .dot { background: var(--later); } .cut .dot { background: var(--cut); }
+  .now { background: var(--accent-soft); } .later { background: var(--later-soft); } .cut { background: var(--cut-soft); }
+  .confirm { color: var(--later); font-weight: 600; }
+  .example { font-variant-numeric: tabular-nums; width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+  .example th, .example td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  .example td.num, .example th.num { text-align: right; }
+</style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Scope · Build With AI: Basics</div>
+  <h1>Bill Splitter (OCR) <span class="badge">approved</span></h1>
+  <p class="lede">Snap a photo of a group receipt, let each person claim what they had, and let the app do the math.</p>
+
+  <section class="kernel">
+    <h2>The unique kernel</h2>
+    <p><strong>Item-level claiming instead of equal splits.</strong> Each receipt item has a unique ID and can belong to one person or be shared by only the people who had it. If two people share something, the third doesn't pay for it. Anything nobody claims is split equally across the group and clearly shown.</p>
+  </section>
+
+  <section>
+    <h2>The core loop</h2>
+    <svg viewBox="0 0 760 150" role="img" aria-label="Flow: receipt photo, OCR items, claim items, per-person summary">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g id="flow" font-size="14" text-anchor="middle" style="color: var(--muted)">
+        <g data-step="0"><rect x="10" y="40" width="150" height="70" rx="10"/><text x="85" y="72">Receipt photo</text><text x="85" y="92" font-size="12">payer snaps it</text></g>
+        <g data-step="1"><rect x="205" y="40" width="150" height="70" rx="10"/><text x="280" y="72">OCR → items</text><text x="280" y="92" font-size="12">name · price · qty · ID</text></g>
+        <g data-step="2"><rect x="400" y="40" width="150" height="70" rx="10"/><text x="475" y="72">Claim items</text><text x="475" y="92" font-size="12">switch person, pick</text></g>
+        <g data-step="3"><rect x="595" y="40" width="155" height="70" rx="10"/><text x="672" y="72">Per-person split</text><text x="672" y="92" font-size="12">owed to payer</text></g>
+        <line x1="162" y1="75" x2="201" y2="75" stroke="currentColor" stroke-width="2" marker-end="url(#arr)"/>
+        <line x1="357" y1="75" x2="396" y2="75" stroke="currentColor" stroke-width="2" marker-end="url(#arr)"/>
+        <line x1="552" y1="75" x2="591" y2="75" stroke="currentColor" stroke-width="2" marker-end="url(#arr)"/>
+        <path d="M672 112 Q672 140 475 140 Q475 140 475 114" fill="none" stroke="currentColor" stroke-dasharray="4 4" stroke-width="1.5" marker-end="url(#arr)"/>
+        <text x="575" y="134" font-size="12">re-test with different claims</text>
+      </g>
+    </svg>
+    <div class="step-controls">
+      <button id="prev" aria-label="Previous step">◀</button>
+      <button id="next" aria-label="Next step">▶</button>
+      <span class="step-text" id="stepText"></span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Who it's for</h2>
+    <p>The friend who paid after a group outing. Today the group has to sit together and work out who bought what, even though everyone already knows what they had.</p>
+  </section>
+
+  <section>
+    <h2>What "working" looks like</h2>
+    <p>On a single screen, one person acts as several people. They scan a real receipt, switch between people to claim items (names appear under each item), share some items among a subset, and see each person's itemized total. Then they re-test the logic with different inputs.</p>
+    <p><strong>The "oh, that's cool" beat:</strong> a shared item split between two people while the third pays nothing, plus unclaimed items spread across everyone, all adding up to the receipt total. The numbers below are illustrative only.</p>
+    <table class="example">
+      <thead><tr><th>Item</th><th>Claimed by</th><th class="num">Price</th></tr></thead>
+      <tbody>
+        <tr><td>Nachos</td><td>A + B (shared)</td><td class="num">12.00</td></tr>
+        <tr><td>Burger</td><td>C</td><td class="num">15.00</td></tr>
+        <tr><td>Fries</td><td>nobody → split A/B/C</td><td class="num">6.00</td></tr>
+        <tr><th colspan="2">A owes 8.00 · B owes 8.00 · C owes 17.00</th><th class="num">33.00</th></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>The boundary</h2>
+    <details class="now" open>
+      <summary><span class="dot"></span>Now: the proof of concept</summary>
+      <ul>
+        <li>Real OCR on a receipt photo with <strong>Google OCR</strong>, because real receipts are messy (details in spec)</li>
+        <li>Editable amounts to fix misreads or adjust the leftover split</li>
+        <li>One screen: enter the group's names, claim on behalf of each person</li>
+        <li>Items with unique IDs; one owner or shared by selected people</li>
+        <li>Everything left unclaimed split equally by default, or amounts edited by hand; shown in the summary</li>
+        <li>Per-person itemized summary of what each owes the payer</li>
+        <li>Split logic tested against varied inputs</li>
+      </ul>
+    </details>
+    <details class="later">
+      <summary><span class="dot"></span>Later</summary>
+      <ul>
+        <li>Shareable group link with friends on their own devices. <em>Architecture designed now, not built or tested.</em></li>
+        <li>Accept → correct → recalculate → approval rounds → publish final split</li>
+        <li>Claiming by quantity for uneven splits (e.g., 3 units split 2-and-1). Even splits are already covered by subset sharing</li>
+      </ul>
+    </details>
+    <details class="cut">
+      <summary><span class="dot"></span>Explicitly cut</summary>
+      <ul>
+        <li>In-app payments. The app shows who owes what; money moves outside it.</li>
+      </ul>
+    </details>
+  </section>
+
+  <section>
+    <h2>Why it matters to you</h2>
+    <p>"Making group bill splitting easier: everyone chooses what they bought, and the app handles the calculations." It's also a chance to experiment with agent orchestration by designing the full architecture up front and building only the single-user slice.</p>
+  </section>
+</main>
+<script>
+  const steps = [
+    "1. The payer takes a photo of the receipt.",
+    "2. Google OCR turns it into items, each with a unique ID, price, and quantity.",
+    "3. One person switches between group members and claims items: solo, shared by a subset, or left unclaimed.",
+    "4. The app shows each person's itemized share owed to the payer. Change the claims and re-check."
+  ];
+  let i = 0;
+  const groups = document.querySelectorAll("#flow [data-step]");
+  function render() {
+    groups.forEach(g => {
+      const on = +g.dataset.step === i;
+      const r = g.querySelector("rect");
+      r.setAttribute("fill", on ? "var(--accent-soft)" : "var(--card)");
+      r.setAttribute("stroke", on ? "var(--accent)" : "var(--line)");
+      r.setAttribute("stroke-width", on ? "2.5" : "1.5");
+      g.querySelectorAll("text").forEach(t => t.setAttribute("fill", on ? "var(--ink)" : "var(--muted)"));
+    });
+    document.getElementById("stepText").textContent = steps[i];
+  }
+  document.getElementById("prev").onclick = () => { i = (i + 3) % 4; render(); };
+  document.getElementById("next").onclick = () => { i = (i + 1) % 4; render(); };
+  render();
+</script>
+</body>
+</html>

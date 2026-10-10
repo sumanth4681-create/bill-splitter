@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bill Splitter Spec</title>
+<style>
+  :root {
+    --bg: #f6f6f3; --card: #ffffff; --ink: #2a2a28; --muted: #66655e; --line: #dcdbd4;
+    --accent: #5b7f75; --accent-soft: #e4eeeb; --slow: #9a6a1f; --slow-soft: #f7eedc;
+    --code: #efeee9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171716; --card: #21211f; --ink: #e8e7e1; --muted: #a6a49c; --line: #393834;
+      --accent: #86b8ab; --accent-soft: #1f3330; --slow: #dcb46c; --slow-soft: #372d19; --code: #2a2a27;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 32px 16px 64px; }
+  .eyebrow { color: var(--muted); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
+  h1 { font-size: 32px; line-height: 1.2; margin: 4px 0 8px; }
+  .lede { color: var(--muted); font-size: 18px; margin: 0 0 24px; }
+  .badge { display: inline-block; font-size: 12px; padding: 2px 10px; border-radius: 99px; background: var(--slow-soft); color: var(--slow); font-weight: 600; vertical-align: middle; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; margin: 16px 0; }
+  h2 { font-size: 18px; margin: 0 0 10px; }
+  p { margin: 6px 0; }
+  code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: 13.5px; }
+  pre { background: var(--code); padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+  svg { width: 100%; height: auto; display: block; }
+  .node rect { transition: fill .15s, stroke .15s; }
+  .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+  button { font: inherit; font-size: 14px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  .step-text { flex: 1 1 300px; font-size: 15px; min-height: 3.2em; }
+  .step-text b { color: var(--accent); }
+  .speed { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 99px; margin-left: 6px; }
+  .fast { background: var(--accent-soft); color: var(--accent); } .slowp { background: var(--slow-soft); color: var(--slow); }
+  details { border: 1px solid var(--line); border-radius: 10px; margin: 8px 0; }
+  summary { cursor: pointer; padding: 10px 14px; font-weight: 600; list-style: none; display: flex; align-items: center; gap: 8px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; margin-left: auto; color: var(--muted); }
+  details[open] summary::after { content: "–"; }
+  summary small { font-weight: 400; color: var(--muted); }
+  .body { padding: 0 16px 14px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .tablewrap { overflow-x: auto; }
+  ul { margin: 4px 0; padding-left: 20px; }
+  .note { color: var(--slow); font-size: 14px; }
+  .future { border-style: dashed; }
+</style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Technical spec · Build With AI: Basics</div>
+  <h1>Bill Splitter <span class="badge">approved</span></h1>
+  <p class="lede">Streamlit screen → FastAPI backend → Document AI, split math, SQLite. All local, all with clear contracts.</p>
+
+  <section>
+    <h2>How the parts interact</h2>
+    <p>Step through a real journey. The highlighted modules are the ones doing work, and the tag shows how fast each step should be.</p>
+    <svg viewBox="0 0 820 330" role="img" aria-label="Architecture: Streamlit calls FastAPI; FastAPI calls ocr.py (Document AI), split.py, storage.py (SQLite)">
+      <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--muted)"/></marker></defs>
+      <g font-size="14" text-anchor="middle">
+        <g class="node" data-n="ui"><rect x="20" y="130" width="150" height="70" rx="10"/><text x="95" y="160">Streamlit</text><text x="95" y="180" font-size="11">frontend/app.py</text></g>
+        <g class="node" data-n="api"><rect x="250" y="130" width="150" height="70" rx="10"/><text x="325" y="160">FastAPI</text><text x="325" y="180" font-size="11">backend/main.py</text></g>
+        <g class="node" data-n="ocr"><rect x="480" y="20" width="150" height="70" rx="10"/><text x="555" y="50">ocr.py</text><text x="555" y="70" font-size="11">read + save/replay</text></g>
+        <g class="node" data-n="split"><rect x="480" y="130" width="150" height="70" rx="10"/><text x="555" y="160">split.py</text><text x="555" y="180" font-size="11">pure math</text></g>
+        <g class="node" data-n="store"><rect x="480" y="240" width="150" height="70" rx="10"/><text x="555" y="270">storage.py</text><text x="555" y="290" font-size="11">sqlite3</text></g>
+        <g class="node" data-n="docai"><rect x="680" y="20" width="125" height="70" rx="10"/><text x="742" y="50">Document AI</text><text x="742" y="70" font-size="11">Google, network</text></g>
+        <g class="node" data-n="db"><rect x="680" y="240" width="125" height="70" rx="10"/><text x="742" y="270">bills.db</text><text x="742" y="290" font-size="11">one file</text></g>
+      </g>
+      <g stroke="var(--muted)" stroke-width="1.5" fill="none" marker-end="url(#ar)">
+        <line x1="172" y1="165" x2="246" y2="165"/>
+        <path d="M402 150 L440 150 L440 55 L476 55"/>
+        <line x1="402" y1="165" x2="476" y2="165"/>
+        <path d="M402 180 L440 180 L440 275 L476 275"/>
+        <line x1="632" y1="55" x2="676" y2="55"/>
+        <line x1="632" y1="275" x2="676" y2="275"/>
+      </g>
+      <text x="210" y="155" font-size="11" text-anchor="middle" fill="var(--muted)">HTTP</text>
+    </svg>
+    <div class="controls">
+      <button id="prev" aria-label="Previous step">◀</button>
+      <button id="next" aria-label="Next step">▶</button>
+      <span class="step-text" id="stepText"></span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Components <small style="font-weight:400;color:var(--muted)">(click to expand)</small></h2>
+
+    <details open><summary>split.py <small>· prd › Claiming Items, Split Summary · subagent experiment</small></summary><div class="body">
+      <p><code>compute_split(items, people, claims, tax_cents, tip_cents, overrides) → Summary</code>. Pure, with no I/O.</p>
+      <ul>
+        <li>Claimed item → divided among its claimers only</li>
+        <li>Unclaimed item → divided among all, labeled <code>unclaimed</code></li>
+        <li>Tax and tip → divided equally among all</li>
+        <li>Rounding: <code>amount // n</code> each, and the first <code>amount % n</code> people get +1¢ (so $10 ÷ 3 = 334 / 333 / 333)</li>
+        <li><code>final_cents</code> = override or computed; <code>matches_receipt</code> ignores overrides</li>
+      </ul>
+      <p>Invariant test: for any input, Σ computed = items + tax + tip.</p>
+      <p class="note">Built by a subagent given only this section plus Contracts. Did the lean context suffice?</p>
+    </div></details>
+
+    <details><summary>ocr.py <small>· prd › Receipt Upload and Reading</small></summary><div class="body">
+      <p><code>read_receipt(image_bytes, mime_type) → ParsedReceipt</code></p>
+      <ul>
+        <li>sha256 of the image → if <code>fixtures/{hash}.json</code> exists, replay it; otherwise call Document AI and save</li>
+        <li><code>map_expense_document(doc)</code> is a separate pure function, tested on saved fixtures</li>
+        <li><code>line_item</code> → item; <code>total_tax_amount</code>, <code>total_amount</code>, <code>supplier_name</code></li>
+        <li>No line items → <code>UnreadableReceipt</code> → 422 "Upload a clear image"</li>
+      </ul>
+      <p class="note">Verify on the first live response: exact entity names, and whether there's a tip entity (fallback: total − items − tax).</p>
+    </div></details>
+
+    <details><summary>FastAPI endpoints <small>· backend/main.py</small></summary><div class="body"><div class="tablewrap">
+      <table>
+        <tr><th>Endpoint</th><th>Input</th><th>PRD</th></tr>
+        <tr><td><code>POST /bills</code></td><td>image</td><td>Upload and Reading</td></tr>
+        <tr><td><code>GET /bills</code></td><td>—</td><td>History</td></tr>
+        <tr><td><code>GET /bills/{id}</code></td><td>—</td><td>History</td></tr>
+        <tr><td><code>PATCH /bills/{id}</code></td><td>name</td><td>Bill name</td></tr>
+        <tr><td><code>PATCH /bills/{id}/items/{item_id}</code></td><td>quantity, price_cents</td><td>Fixing Misreads</td></tr>
+        <tr><td><code>PUT /bills/{id}/people</code></td><td>names</td><td>People</td></tr>
+        <tr><td><code>PUT /bills/{id}/claims</code></td><td>item_id, person_id, claimed</td><td>Claiming Items</td></tr>
+        <tr><td><code>PUT /bills/{id}/overrides</code></td><td>person_id, amount_cents|null</td><td>Split Summary</td></tr>
+      </table></div>
+      <p>Every mutating call returns the full <code>BillDetail</code> (with a fresh summary), and every request logs its duration.</p>
+    </div></details>
+
+    <details><summary>storage.py + SQLite <small>· prd › History</small></summary><div class="body">
+<pre>bills   (id, name, created_at, image_hash, tax_cents, tip_cents, receipt_total_cents)
+items   (id, bill_id, position, name, quantity, price_cents)
+people  (id, bill_id, position, name, override_cents NULL)
+claims  (item_id, person_id)  PK(item_id, person_id)</pre>
+      <p>The summary is never stored. It's recomputed on every request, so it's always current.</p>
+    </div></details>
+
+    <details><summary>Streamlit screen <small>· prd › Screens and Layout</small></summary><div class="body">
+      <p>Tabs: Upload, History. Bill view: name → names + person dropdown → summary (totals warning if mismatched) → items with checkboxes and claimers listed under each.</p>
+      <p>Holds only the current bill and selected person in <code>session_state</code>. Muted sage theme in <code>.streamlit/config.toml</code>, with <code>st.toast</code> for feedback.</p>
+    </div></details>
+
+    <details class="future"><summary>Future: shareable link <small>· designed, not built</small></summary><div class="body">
+      <ul>
+        <li>Adding a person sends them a link: <code>bills.share_token</code> + <code>GET /share/{token}</code>; friends pick their name, with no accounts</li>
+        <li>Approval rounds: <code>bills.version</code> + <code>approvals(person_id, version)</code>; final when everyone accepts the latest version</li>
+        <li><code>split.py</code> is unchanged; the screen already only talks to the API</li>
+      </ul>
+    </div></details>
+  </section>
+
+  <section>
+    <h2>Run it</h2>
+<pre>cd bill-splitter
+uvicorn backend.main:app --reload --port 8000
+streamlit run frontend/app.py      # http://localhost:8501</pre>
+    <p>Local only. Demo video: live upload → 3 names → solo, shared, and unclaimed items → total matches → edit one amount → reopen from History.</p>
+  </section>
+
+  <section>
+    <h2>File structure</h2>
+<pre>bill-splitter/
+├── backend/   main.py · models.py · ocr.py · split.py · storage.py · fixtures/
+├── frontend/  app.py · api_client.py
+├── tests/     test_split.py · test_ocr_mapping.py · test_api.py
+├── .streamlit/config.toml
+├── data/      bills.db (gitignored)
+├── requirements.txt · .env.example · README.md</pre>
+  </section>
+
+  <section>
+    <h2>Failure modes</h2>
+    <ul>
+      <li><b>Blurry photo / not a receipt</b> → "Upload a clear image of the receipt"</li>
+      <li><b>Google not configured</b> → "Receipt reader isn't configured. Check .env." (replay mode still works)</li>
+      <li><b>Backend down</b> → "Backend isn't running. Start it with uvicorn…"</li>
+      <li><b>Totals disagree</b> → a warning pointing to a misread row</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Open</h2>
+    <ul>
+      <li><s>Is the payer one of the names?</s> Resolved: the payer adds people, and adding themselves is optional (no special treatment)</li>
+      <li>Document AI tip entity: verify on the first live response</li>
+      <li>Trial credits and pricing: confirm when creating the Cloud project</li>
+    </ul>
+  </section>
+</main>
+<script>
+  const steps = [
+    { on: ["ui","api","ocr","docai","store","db"], speed: "slow", t: "<b>Upload.</b> Streamlit → POST /bills → ocr.py calls Document AI (or replays a saved response) → storage.py writes the bill and items." },
+    { on: ["ui","api","store","db","split"], speed: "fast", t: "<b>Show the bill.</b> FastAPI loads rows from SQLite, runs split.py, and returns BillDetail." },
+    { on: ["ui","api","store","db","split"], speed: "fast", t: "<b>Fix a misread.</b> PATCH the item → saved → summary recomputed." },
+    { on: ["ui","api","store","db","split"], speed: "fast", t: "<b>Add names.</b> PUT /people → the dropdown fills from the response." },
+    { on: ["ui","api","store","db","split"], speed: "fast", t: "<b>Claim.</b> PUT /claims → the name appears under the item, and the summary updates on the same response." },
+    { on: ["ui","api","store","db","split"], speed: "fast", t: "<b>Edit a final amount.</b> PUT /overrides → the summary marks it as edited." },
+    { on: ["ui","api","store","db","split"], speed: "fast", t: "<b>History.</b> GET /bills, then GET /bills/{id}. Same view, recomputed summary." }
+  ];
+  let i = 0;
+  function render() {
+    const s = steps[i];
+    document.querySelectorAll(".node").forEach(n => {
+      const on = s.on.includes(n.dataset.n), r = n.querySelector("rect");
+      r.setAttribute("fill", on ? "var(--accent-soft)" : "var(--card)");
+      r.setAttribute("stroke", on ? "var(--accent)" : "var(--line)");
+      r.setAttribute("stroke-width", on ? 2.5 : 1.5);
+      n.querySelectorAll("text").forEach(t => t.setAttribute("fill", on ? "var(--ink)" : "var(--muted)"));
+    });
+    const tag = s.speed === "slow" ? '<span class="speed slowp">seconds · network</span>' : '<span class="speed fast">milliseconds · local</span>';
+    document.getElementById("stepText").innerHTML = `${i + 1}/${steps.length} ${s.t} ${tag}`;
+  }
+  document.getElementById("prev").onclick = () => { i = (i + steps.length - 1) % steps.length; render(); };
+  document.getElementById("next").onclick = () => { i = (i + 1) % steps.length; render(); };
+  render();
+</script>
+</body>
+</html>

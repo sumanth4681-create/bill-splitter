@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bill Splitter PRD</title>
+<style>
+  :root {
+    --bg: #f5f5f2; --card: #ffffff; --ink: #222220; --muted: #63625c;
+    --line: #dddcd5; --accent: #3d6b62; --accent-soft: #e5efec;
+    --warn: #8a6420; --warn-soft: #f6eedd; --err: #9a4a3f; --err-soft: #f6e5e1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171716; --card: #21211f; --ink: #e9e8e2; --muted: #a5a39b;
+      --line: #383733; --accent: #7fb5a8; --accent-soft: #1f3330;
+      --warn: #d8b26a; --warn-soft: #362d1a; --err: #df8f80; --err-soft: #3a2420;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+  .eyebrow { color: var(--muted); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
+  h1 { font-size: 32px; line-height: 1.2; margin: 4px 0 8px; }
+  .lede { color: var(--muted); font-size: 18px; margin: 0 0 24px; }
+  .badge { display: inline-block; font-size: 12px; padding: 2px 10px; border-radius: 99px;
+    background: var(--warn-soft); color: var(--warn); font-weight: 600; vertical-align: middle; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; margin: 16px 0; }
+  h2 { font-size: 18px; margin: 0 0 10px; }
+  h3 { font-size: 15px; margin: 14px 0 4px; }
+  p { margin: 6px 0; }
+  .grew { border-left: 4px solid var(--accent); background: var(--accent-soft); }
+  svg { width: 100%; height: auto; display: block; }
+  .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+  button { font: inherit; font-size: 14px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--card); color: var(--ink); cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  .step-text { flex: 1 1 280px; font-size: 15px; }
+  .step-text b { color: var(--accent); }
+  details { border: 1px solid var(--line); border-radius: 10px; margin: 8px 0; }
+  summary { cursor: pointer; padding: 10px 14px; font-weight: 600; list-style: none; display: flex; align-items: center; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; margin-left: auto; color: var(--muted); }
+  details[open] summary::after { content: "–"; }
+  .body { padding: 0 16px 12px; }
+  ul { margin: 4px 0; padding-left: 20px; }
+  .crit { list-style: none; padding-left: 0; }
+  .crit li::before { content: "☐ "; color: var(--accent); }
+  .assume { color: var(--warn); font-size: 14px; }
+  .state { display: grid; grid-template-columns: 160px 1fr; gap: 6px 14px; font-size: 15px; }
+  .state dt { font-weight: 600; } .state dd { margin: 0; color: var(--muted); }
+  .state .bad { color: var(--err); }
+  .mock { border: 1px solid var(--line); border-radius: 10px; padding: 12px; font-size: 14px; background: var(--bg); }
+  .mock .row { display: flex; justify-content: space-between; align-items: center; padding: 6px 4px; border-bottom: 1px dashed var(--line); gap: 8px; }
+  .mock .row:last-child { border-bottom: 0; }
+  .mock .who { font-size: 12px; color: var(--accent); }
+  .mock .lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin: 8px 0 4px; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); font-size: 12px; margin-right: 4px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) { .cols { grid-template-columns: 1fr; } .state { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Product requirements · Build With AI: Basics</div>
+  <h1>Bill Splitter <span class="badge">approved</span></h1>
+  <p class="lede">Upload a receipt, claim items for each friend, see what everyone owes the payer.</p>
+
+  <section class="grew">
+    <h2>How the scope grew</h2>
+    <p>Scope said <em>"people claim their items."</em> Now we know exactly what that means: friends' names go above the items, a <strong>person dropdown</strong> picks who you're claiming for, selecting an item puts that name under it, and selecting it under two people makes it shared. Unclaimed items, tax, and tip are split equally, and final amounts can be edited.</p>
+  </section>
+
+  <section>
+    <h2>The core journey</h2>
+    <svg viewBox="0 0 800 170" role="img" aria-label="Journey: Upload, Reading, Fix items, Add names, Claim, Summary, History">
+      <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--muted)"/></marker></defs>
+      <g id="journey" font-size="13" text-anchor="middle"></g>
+    </svg>
+    <div class="controls">
+      <button id="prev" aria-label="Previous step">◀</button>
+      <button id="next" aria-label="Next step">▶</button>
+      <span class="step-text" id="stepText"></span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Screens and layout</h2>
+    <div class="cols">
+      <div>
+        <h3>Upload</h3>
+        <p>An image input. After upload, a spinner shows ("reading / summarizing"), then the bill opens.</p>
+        <h3>History</h3>
+        <p>A list of past bills by name. Click one to reopen it.</p>
+      </div>
+      <div class="mock" aria-label="Bill view sketch">
+        <strong>Dinner at Luigi's</strong>
+        <div class="lbl">Friends</div>
+        <span class="pill">A</span><span class="pill">B</span><span class="pill">C</span> &nbsp;Claiming as: <b>A ▾</b>
+        <div class="lbl">Summary <span class="assume">(placement assumed)</span></div>
+        <div class="row"><span>A · Nachos ½, Fries ⅓</span><span class="num">8.00</span></div>
+        <div class="row"><span>B · Nachos ½, Fries ⅓</span><span class="num">8.00</span></div>
+        <div class="row"><span>C · Burger, Fries ⅓</span><span class="num">17.00</span></div>
+        <div class="lbl">Items</div>
+        <div class="row"><span>☑ Nachos · 1 · <span class="num">12.00</span><br><span class="who">A, B</span></span><span>✎</span></div>
+        <div class="row"><span>☐ Burger · 1 · <span class="num">15.00</span><br><span class="who">C</span></span><span>✎</span></div>
+        <div class="row"><span>☐ Fries · 1 · <span class="num">6.00</span><br><span class="who">unclaimed → everyone</span></span><span>✎</span></div>
+      </div>
+    </div>
+    <p class="assume">Sketch is illustrative; example numbers ignore tax and tip.</p>
+  </section>
+
+  <section>
+    <h2>Features and acceptance criteria</h2>
+    <details open><summary>Receipt upload and reading</summary><div class="body">
+      <p>Photo → Google OCR → items, each with a unique ID, name, quantity, and price. Tax and tip are captured separately.</p>
+      <ul class="crit"><li>A real receipt photo shows the spinner, then items matching the receipt</li><li>Two same-name items appear as two separate rows, claimable independently</li></ul>
+    </div></details>
+    <details><summary>Fixing misreads</summary><div class="body">
+      <p>Quantity and price are editable on each row, only to correct OCR errors.</p>
+      <ul class="crit"><li>Editing a price updates the summary immediately</li></ul>
+    </div></details>
+    <details><summary>People</summary><div class="body">
+      <p>Friends' names are entered above the items and populate the person dropdown.</p>
+      <ul class="crit"><li>Adding three names puts all three in the dropdown</li></ul>
+    </div></details>
+    <details><summary>Claiming items: the kernel</summary><div class="body">
+      <p>Pick a person, then select items. Their name appears under each item. Selecting an item under 2+ people makes it shared among only them. Deselecting removes the claim.</p>
+      <ul class="crit"><li>Nachos selected as A, then B: both names shown, and C pays nothing for it</li><li>Deselecting removes the name and updates the summary</li></ul>
+    </div></details>
+    <details><summary>Split summary</summary><div class="body">
+      <p>Per person: name, items, and the amount owed to the payer. Unclaimed items, tax, and tip are split equally by default, and final amounts are editable.</p>
+      <ul class="crit"><li>All amounts sum to the receipt total (before manual edits)</li><li>Unclaimed items are labeled and spread across everyone</li><li>Editing a final amount shows the new amount</li></ul>
+    </div></details>
+    <details><summary>History</summary><div class="body">
+      <p>Every processed bill is saved and listed by name. Reopening it restores the items, names, claims, and summary.</p>
+      <ul class="crit"><li>A processed bill appears in History, and reopening it shows the same claims</li></ul>
+    </div></details>
+  </section>
+
+  <section>
+    <h2>States</h2>
+    <dl class="state">
+      <dt>Empty History</dt><dd>A message pointing to Upload <span class="assume">(assumption)</span></dd>
+      <dt>Reading</dt><dd>Spinner while OCR runs</dd>
+      <dt class="bad">Unreadable image</dt><dd>"Upload a clear image," then retry</dd>
+      <dt>No names yet</dt><dd>Can't claim until a name is added <span class="assume">(assumption)</span></dd>
+      <dt>Nothing claimed</dt><dd>Everything split equally across everyone</dd>
+      <dt>Saved</dt><dd>Bills, names, and claims reappear in History</dd>
+    </dl>
+  </section>
+
+  <section>
+    <h2>Boundary</h2>
+    <details open><summary>Building now</summary><div class="body">
+      <p>Upload + spinner → Google OCR → editable items with unique IDs → names + dropdown → claim/share → summary (equal splits, editable) → History.</p>
+    </div></details>
+    <details><summary>Deferred</summary><div class="body"><ul>
+      <li>Shareable link and multiple devices (architecture designed in spec, not built)</li>
+      <li>Accept / recalculate / approval rounds / publish</li>
+      <li>Claiming by quantity (e.g., 3 beers split 2-and-1)</li>
+    </ul></div></details>
+    <details><summary>Non-goals</summary><div class="body"><ul>
+      <li>In-app payments</li><li>Accounts or login</li>
+    </ul></div></details>
+  </section>
+
+  <section>
+    <h2>Open questions</h2>
+    <ul>
+      <li><b>Bill name:</b> assumed to default to the restaurant name or date, and editable</li>
+      <li><b>Summary placement:</b> assumed below the names, above the items</li>
+      <li><b>Rounding:</b> who gets the extra cent? Can be decided in spec</li>
+    </ul>
+  </section>
+</main>
+<script>
+  const steps = [
+    ["Upload", "The payer uploads the receipt photo from their phone."],
+    ["Reading", "A spinner shows while Google OCR reads the receipt."],
+    ["Fix items", "Items appear top to bottom; a misread quantity or price can be edited."],
+    ["Add names", "The friends' names are entered above the items and fill the dropdown."],
+    ["Claim", "Pick a person, select their items; their name appears under each. Shared = selected by 2+ people."],
+    ["Summary", "Each person's items and amount. Unclaimed items, tax, and tip are split equally; amounts are editable."],
+    ["History", "The bill is saved; reopen it any time from History."]
+  ];
+  const g = document.getElementById("journey");
+  const NS = "http://www.w3.org/2000/svg";
+  const w = 100, gap = 13, y = 55;
+  steps.forEach((s, k) => {
+    const x = 6 + k * (w + gap);
+    const grp = document.createElementNS(NS, "g"); grp.dataset.k = k;
+    const r = document.createElementNS(NS, "rect");
+    Object.entries({x, y, width: w, height: 56, rx: 10}).forEach(([a, v]) => r.setAttribute(a, v));
+    const t = document.createElementNS(NS, "text");
+    t.setAttribute("x", x + w / 2); t.setAttribute("y", y + 33); t.textContent = s[0];
+    const n = document.createElementNS(NS, "text");
+    n.setAttribute("x", x + w / 2); n.setAttribute("y", y - 10); n.setAttribute("font-size", "11"); n.textContent = k + 1;
+    grp.append(r, t, n); g.append(grp);
+    if (k < steps.length - 1) {
+      const l = document.createElementNS(NS, "line");
+      Object.entries({x1: x + w + 1, y1: y + 28, x2: x + w + gap - 1, y2: y + 28, stroke: "var(--muted)", "stroke-width": 1.5, "marker-end": "url(#a)"}).forEach(([a, v]) => l.setAttribute(a, v));
+      g.append(l);
+    }
+  });
+  const loop = document.createElementNS(NS, "path");
+  const xs = k => 6 + k * (w + gap) + w / 2;
+  loop.setAttribute("d", `M${xs(5)} ${y + 58} Q${xs(5)} 150 ${(xs(4)+xs(5))/2} 150 Q${xs(4)} 150 ${xs(4)} ${y + 60}`);
+  Object.entries({fill: "none", stroke: "var(--muted)", "stroke-dasharray": "4 4", "marker-end": "url(#a)"}).forEach(([a, v]) => loop.setAttribute(a, v));
+  g.append(loop);
+  const lt = document.createElementNS(NS, "text");
+  lt.setAttribute("x", (xs(4)+xs(5))/2); lt.setAttribute("y", 165); lt.setAttribute("font-size", "11"); lt.setAttribute("fill", "var(--muted)");
+  lt.textContent = "re-claim & watch it update"; g.append(lt);
+
+  let i = 0;
+  function render() {
+    g.querySelectorAll("[data-k]").forEach(grp => {
+      const on = +grp.dataset.k === i, r = grp.querySelector("rect");
+      r.setAttribute("fill", on ? "var(--accent-soft)" : "var(--card)");
+      r.setAttribute("stroke", on ? "var(--accent)" : "var(--line)");
+      r.setAttribute("stroke-width", on ? 2.5 : 1.5);
+      grp.querySelectorAll("text").forEach(t => t.setAttribute("fill", on ? "var(--ink)" : "var(--muted)"));
+    });
+    document.getElementById("stepText").innerHTML = `<b>${i + 1}. ${steps[i][0]}:</b> ${steps[i][1]}`;
+  }
+  document.getElementById("prev").onclick = () => { i = (i + steps.length - 1) % steps.length; render(); };
+  document.getElementById("next").onclick = () => { i = (i + 1) % steps.length; render(); };
+  render();
+</script>
+</body>
+</html>
