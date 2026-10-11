@@ -38,6 +38,10 @@ def get_bill(bill_id: int) -> dict:
     return _request("GET", f"/bills/{bill_id}")
 
 
+def list_bills() -> list:
+    return _request("GET", "/bills")
+
+
 def set_people(bill_id: int, names: list[str]) -> dict:
     return _request("PUT", f"/bills/{bill_id}/people", json={"names": names})
 

@@ -2,7 +2,7 @@
 
 import os
 import sqlite3
-from datetime import date, datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 from backend.models import ParsedReceipt
@@ -66,8 +66,9 @@ def init_db() -> None:
 
 
 def create_bill(parsed: ParsedReceipt, image_hash: str) -> int:
-    name = parsed.merchant or f"Bill – {date.today().isoformat()}"
-    created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    now = datetime.now().astimezone()  # local wall clock with offset, so History dates match the bill name
+    name = parsed.merchant or f"Bill – {now.date().isoformat()}"
+    created_at = now.isoformat(timespec="seconds")
     with connect() as conn:
         cur = conn.execute(
             "INSERT INTO bills (name, created_at, image_hash, tax_cents, tip_cents, receipt_total_cents)"
@@ -166,3 +167,10 @@ def set_override(person_id: int, amount_cents: int | None) -> None:
     """A person's hand-edited final amount; None clears it."""
     with connect() as conn:
         conn.execute("UPDATE people SET override_cents = ? WHERE id = ?", (amount_cents, person_id))
+
+
+def list_bills() -> list[dict]:
+    """All bills, newest first."""
+    with connect() as conn:
+        rows = conn.execute("SELECT id, name, created_at FROM bills ORDER BY created_at DESC, id DESC").fetchall()
+    return [dict(r) for r in rows]

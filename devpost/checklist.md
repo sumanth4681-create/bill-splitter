@@ -49,7 +49,7 @@ Build mode: learn (chosen by default on 2026-10-10; learner can switch to fast a
   Learner check: Change a price on one row and watch the summary update; type in a tax amount and watch everyone's share change; set one person's final amount by hand and confirm it shows as edited.
   Commit: `Edit items, bill name, and final amounts`
 
-- [ ] **5. Come back to past bills, and fail gracefully**
+- [x] **5. Come back to past bills, and fail gracefully**
   Becomes usable: The History tab lists saved bills newest first (or an empty message pointing to Upload); clicking one reopens it with its names, claims, and summary, even after restarting both servers. A blurry or non-receipt photo shows "Upload a clear image of the receipt" with the uploader still there; a stopped backend or missing Google config shows a plain message instead of a crash.
   Why now: History and error states round out the full core journey and the demo script; they depend on everything above being saved and editable.
   PRD ref: `prd.md > History`, `prd.md > States and Boundaries`, `prd.md > The Core Journey` (step 11)
@@ -93,3 +93,4 @@ Activity mode: [live app and editor, explicit static fallback, focused alternati
 - Known limit of the subtotal-gap rule: when a receipt has two tax lines and a reader returns only one, the remainder is labelled tip (Umami: $2.00 liquor tax shows as tip). Totals still agree; editing tax/tip in slice 4 is the fix.
 - Comparison through the app's own readers (5 receipts, 2026-10-10): local model got every row on all 5 (Google: 3 of 5), at 30–55 s vs ~2 s live. Google reads replay instantly after the first run; the script runs Google in parallel with the local reads.
 - The shares now always add up to the receipt total: any gap between the rows and the receipt is split equally as a visible "Receipt difference" line (warning kept), and a bill-level Discount box was added — learner decision at the slice-4 checkpoint: "whatever editing we do the total should be the same, and we can add a discount which subtracts." Property test extended: for random bills, discounts, and receipt totals, the shares sum to exactly what was paid.
+- Bill timestamps are stored in local time with an offset instead of UTC — History showed the next day's date for evening uploads while the bill name used the local date.

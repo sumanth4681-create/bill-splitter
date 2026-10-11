@@ -10,7 +10,7 @@ from pydantic import BaseModel
 load_dotenv()
 
 from backend import ocr, ocr_local, split, storage  # noqa: E402  (after .env is loaded)
-from backend.models import BillDetail, Claim, Item, Person, Summary  # noqa: E402
+from backend.models import BillDetail, BillListItem, Claim, Item, Person, Summary  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 log = logging.getLogger("bill_splitter.api")
@@ -81,6 +81,11 @@ async def create_bill(image: UploadFile = File(...), reader: str = Form("docai")
         raise HTTPException(status_code=500, detail=str(exc))
     bill_id = storage.create_bill(parsed, ocr.image_hash(data))
     return _bill_detail(bill_id)
+
+
+@app.get("/bills", response_model=list[BillListItem])
+def list_bills() -> list[BillListItem]:
+    return [BillListItem(**row) for row in storage.list_bills()]
 
 
 @app.get("/bills/{bill_id}", response_model=BillDetail)

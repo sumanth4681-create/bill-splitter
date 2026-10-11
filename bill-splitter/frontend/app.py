@@ -232,8 +232,24 @@ def upload_tab() -> None:
         st.toast("Receipt read")
 
 
+def open_bill(bill_id: int) -> None:
+    st.session_state.bill_id = bill_id
+
+
 def history_tab() -> None:
-    st.caption("Past bills will be listed here.")
+    try:
+        bills = api_client.list_bills()
+    except (api_client.BackendUnavailable, api_client.ApiError) as exc:
+        show_error(exc)
+        return
+    if not bills:
+        st.info("No bills yet. Upload a receipt to get started.")
+        return
+    st.caption("Newest first. Click a bill to reopen it with its names and claims.")
+    for b in bills:
+        day = b["created_at"][:10]
+        st.button(f"{b['name']}  ·  {day}", key=f"open_{b['id']}", on_click=open_bill, args=(b["id"],),
+                  use_container_width=True)
 
 
 st.title("Bill Splitter")
