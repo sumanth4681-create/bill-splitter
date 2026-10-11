@@ -162,7 +162,7 @@ Required tests (`tests/test_split.py`): solo claim; a shared item between 2 of 3
 Functions: `init_db()`, `create_bill(parsed, image_hash) -> id`, `list_bills()`, `get_bill_rows(id)`, `update_bill(id, name?, tax_cents?, tip_cents?, receipt_total_cents?)`, `update_item`, `replace_people(id, names)`, `set_claim(item_id, person_id, claimed)`, `set_override(person_id, amount_cents|None)`. Uses `sqlite3` with foreign keys on, writing to `data/bills.db`.
 PRD ref: `prd.md > History`, `prd.md > States and Boundaries` (persistence).
 
-### Future: Shareable Link (designed, not built)
+### Future: Shareable Link (designed, not built — planned for after submission on a `share-link` branch)
 From `scope.md > Later`. **Nothing here gets implemented in the POC.**
 - Add `bills.share_token` (random string). `GET /share/{token}` returns the same `BillDetail`.
 - When the payer adds a person to the bill, that person is sent a link. A friend opens the link on their phone, picks their own name from `people` (no accounts), and only claims for themselves. The same `PUT /claims` is used, scoped to their `person_id`.
