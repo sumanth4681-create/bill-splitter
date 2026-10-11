@@ -147,3 +147,10 @@ def test_discount_line_reduces_what_claimers_pay():
     assert [p.computed_cents for p in s.people] == [450, 450, 600]
     assert s.matches_receipt
 
+
+def test_duplicate_person_ids_count_once():
+    twice = [Person(id=1, name="a"), Person(id=1, name="b"), Person(id=2, name="c")]
+    s = compute_split([item(1, 100)], twice, [Claim(item_id=1, person_id=1)], 0, 0, {})
+    assert [p.person_id for p in s.people] == [1, 2]
+    assert sum(p.computed_cents for p in s.people) == 100 and s.matches_receipt
+

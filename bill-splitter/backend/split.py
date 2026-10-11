@@ -20,6 +20,8 @@ def compute_split(
     discount_cents: int = 0,
 ) -> Summary:
     overrides = overrides or {}
+    seen: set[int] = set()
+    people = [p for p in people if not (p.id in seen or seen.add(p.id))]  # one share per person id
     items_total = sum(item.price_cents for item in items)
     expected = items_total + tax_cents + tip_cents - discount_cents
     receipt_total = expected if receipt_total_cents is None else receipt_total_cents

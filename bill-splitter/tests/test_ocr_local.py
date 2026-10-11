@@ -98,3 +98,43 @@ def test_absurd_model_values_are_ignored_not_crashed():
     r = map_local_response(data)
     assert [(i.name, i.quantity, i.price_cents) for i in r.items] == [("Soup", 1, 450), ("Big qty", 1, 100)]
 
+
+@pytest.mark.parametrize("bad", ["abc", {"a": 1}, 5, [None], [1], [[]]])
+def test_malformed_items_are_unreadable_not_a_crash(bad):
+    with pytest.raises(UnreadableReceipt):
+        map_local_response({"items": bad, "subtotal": None, "tax": None, "tip": None, "total": None})
+    for not_a_dict in ([], None):
+        with pytest.raises(UnreadableReceipt):
+            map_local_response(not_a_dict)
+
+
+def test_extract_json_is_robust_to_junk_and_hostile_text():
+    import time
+
+    assert extract_json('{"a": 1} then {"b": 2}') == {"a": 1}           # first object wins, trailing chatter ignored
+    assert extract_json('{"items": []} :-}')["items"] == []
+    for hostile in ['{"a": ' + "9" * 5000 + "}", '{"a":' * 100_000 + "1" + "}" * 100_000, "{" * 400_000]:
+        started = time.perf_counter()
+        with pytest.raises(UnreadableReceipt):
+            extract_json(hostile)
+        assert time.perf_counter() - started < 1.0
+
+
+def test_summary_filter_matches_whole_labels_only():
+    rows = [("Sub-Total", 1, 1), ("TOTAL:", 1, 1), ("Tax 8%", 1, 1), ("Total Wine 750ml", 1, 1299),
+            ("Cash register toy", 1, 999), ("Tender chicken", 1, 850), ("Balance ball", 1, 2000), ("Amount of Love Cake", 1, 400)]
+    assert [n for n, _, _ in clean_rows(rows, None)] == [
+        "Total Wine 750ml", "Cash register toy", "Tender chicken", "Balance ball", "Amount of Love Cake"]
+    r = map_local_response({"items": [{"name": None, "quantity": 1, "price": 5.0}],
+                            "subtotal": None, "tax": None, "tip": None, "total": None})
+    assert r.items[0].price_cents == 500  # a nameless row is kept, not mistaken for the "Item(s)" label
+
+
+@pytest.mark.parametrize("printed, cents", [
+    ("12,99", 1299), ("1,234.56", 123456), ("$ 7.50", 750), ("1_000", None), ("1e308", None), ("12.995", 1300)])
+def test_money_strings(printed, cents):
+    from backend.ocr_local import _cents
+
+    assert _cents(printed) == cents
+    assert _cents(10**5000) is None and _cents(1e15) is None
+

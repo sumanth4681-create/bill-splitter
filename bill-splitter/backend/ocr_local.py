@@ -54,10 +54,16 @@ SCHEMA = {
     "required": ["merchant", "items", "subtotal", "tax", "tip", "total"],
 }
 
+# A whole row that is just a summary label, optionally followed by punctuation, a percentage,
+# or an amount: "TOTAL", "Sub-Total:", "Tax 8%". Not "Total Wine 750ml" or "Cash register toy".
 SUMMARY_LABEL = re.compile(
-    r"^(sub\s?total|total|tax|gst|hst|vat|tip|gratuity|balance|change|cash|card|tender|visa|master|amount|items?|number of)\b",
+    r"^(sub[\s-]?total|total|tax|gst|hst|vat|tip|gratuity|balance(\s+due)?|change(\s+due)?|cash|card|credit|debit|"
+    r"tender|visa|master\s?card|amex|amount(\s+due)?|items?|number\s+of\s+items|rounding)"
+    r"\s*[:.\-]?\s*[\d.,%$-]*\s*$",
     re.I,
 )
+MAX_JSON_CHARS = 200_000
+UNNAMED = "(unnamed row)"
 
 
 class LocalReaderUnavailable(Exception):
@@ -117,30 +123,47 @@ def call_model(image_bytes: bytes, mime_type: str) -> dict:
 
 
 def extract_json(text: str) -> dict:
-    match = re.search(r"\{.*\}", text, re.S)
-    if not match:
+    """The first JSON object in the model's text. Trailing chatter is ignored; anything
+    malformed, absurdly nested, or absurdly long counts as unreadable, never as a crash."""
+    text = (text or "")[:MAX_JSON_CHARS]
+    start = text.find("{")
+    if start < 0:
         raise UnreadableReceipt("Upload a clear image of the receipt.")
     try:
-        return json.loads(match.group(0))
-    except json.JSONDecodeError as exc:
+        data, _ = json.JSONDecoder().raw_decode(text, start)
+    except (ValueError, RecursionError) as exc:  # JSONDecodeError is a ValueError; huge ints raise ValueError too
         raise UnreadableReceipt("Upload a clear image of the receipt.") from exc
+    if not isinstance(data, dict):
+        raise UnreadableReceipt("Upload a clear image of the receipt.")
+    return data
 
 
 # ---------- pure mapping ----------
 
+_MONEY_TEXT = re.compile(r"^[-+]?\$?\s*\d[\d,]*(\.\d+)?$|^[-+]?\$?\s*\d+,\d{1,2}$")
+
+
 def _cents(value) -> int | None:
+    """Integer cents from a number or a printed-looking string; None for anything else."""
     if value is None or isinstance(value, bool) or not isinstance(value, (int, float, str)):
         return None
     try:
-        amount = Decimal(str(value).replace("$", "").replace(",", "").strip())
-    except InvalidOperation:
+        if isinstance(value, str):
+            text = value.strip()
+            if not _MONEY_TEXT.match(text):
+                return None
+            text = text.replace("$", "").replace(" ", "")
+            if "," in text and "." not in text and re.search(r",\d{1,2}$", text):
+                text = text.replace(",", ".")  # "12,99" is a decimal comma, not thousands
+            amount = Decimal(text.replace(",", ""))
+        else:
+            amount = Decimal(str(value))
+        if not amount.is_finite():
+            return None
+        cents = int((amount * 100).quantize(Decimal("1")))
+    except (InvalidOperation, ValueError, OverflowError):  # NaN/inf, 5000-digit ints, absurd exponents
         return None
-    if not amount.is_finite():
-        return None
-    try:
-        return int((amount * 100).quantize(Decimal("1")))
-    except InvalidOperation:  # absurd exponents
-        return None
+    return cents if abs(cents) <= MAX_CENTS else None
 
 
 def clean_rows(rows: list[tuple[str, int, int]], subtotal_cents: int | None) -> list[tuple[str, int, int]]:
@@ -156,12 +179,17 @@ def clean_rows(rows: list[tuple[str, int, int]], subtotal_cents: int | None) -> 
 
 
 def map_local_response(data: dict) -> ParsedReceipt:
+    if not isinstance(data, dict):
+        raise UnreadableReceipt("Upload a clear image of the receipt.")
+    raw_items = data.get("items")
     rows = []
-    for raw in data.get("items") or []:
-        price = _cents(raw.get("price"))
-        if price is None or abs(price) > MAX_CENTS:
+    for raw in raw_items if isinstance(raw_items, list) else []:
+        if not isinstance(raw, dict):
             continue
-        name = " ".join(str(raw.get("name") or "").split())[:200] or "Item"
+        price = _cents(raw.get("price"))
+        if price is None:
+            continue
+        name = " ".join(str(raw.get("name") or "").split())[:200] or UNNAMED
         qty = raw.get("quantity")
         if isinstance(qty, bool) or not isinstance(qty, int) or not 1 <= qty <= MAX_QUANTITY:
             qty = 1
