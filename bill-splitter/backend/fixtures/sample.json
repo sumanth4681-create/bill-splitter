@@ -1,7 +1,7 @@
 {
   "uri": "",
   "mimeType": "image/png",
-  "text": "CT 26, 2023\nCT 26, 023\nRY DEPOT #451\n00 SOG, HN\nHOCERY DEPOT #451\nOCT 26, 2023\n15:AM\nOrganic Milk\n$6.99\nFresh Eggs\n$5.49\nGround Beef\n$14.80\nBread\n$4.25\nApples\n$6.10\nPasta\n$3.95\nSUBTOTAL\n$41.58\n$3.33\n$5.91\n$4.25\nGrund\n$6.10\nGonnty Beers\nProper\n$6.95\n$3.95\nSUBTOTAL\nTAX\n$41.58\nTOTAL\n$3.33\n$44.91\nGROCERY DE\nOCT 26, 2023 #451\n",
+  "text": "#################################################################\nOCT 26, 2023\n15:AM\nOrganic Milk\n$6.99\nFresh Eggs\n$5.49\nGround Beef\n$14.80\nBread\n$4.25\nApples\n$6.10\nPasta\n$3.95\nSUBTOTAL\n$41.58\n$3.33\n$5.91\n$4.25\nGrund\n$6.10\nGonnty Beers\nProper\n$6.95\n$3.95\nSUBTOTAL\nTAX\n$41.58\nTOTAL\n$3.33\n$44.91\nGROCERY DE\nOCT 26, 2023 #451\n",
   "pages": [
     {
       "pageNumber": 1,
@@ -11381,56 +11381,6 @@
           "currencyCode": ""
         }
       },
-      "mentionId": "",
-      "properties": [],
-      "redacted": false,
-      "method": 0
-    },
-    {
-      "textAnchor": {
-        "textSegments": [
-          {
-            "endIndex": "65",
-            "startIndex": "0"
-          }
-        ],
-        "content": "CT 26, 2023\nCT 26, 023\nRY DEPOT #451\n00 SOG, HN\nHOCERY DEPOT #451"
-      },
-      "type": "supplier_address",
-      "mentionText": "CT 26, 2023\nCT 26, 023\nRY DEPOT #451\n00 SOG, HN\nHOCERY DEPOT #451",
-      "confidence": 0.5165029,
-      "pageAnchor": {
-        "pageRefs": [
-          {
-            "boundingPoly": {
-              "normalizedVertices": [
-                {
-                  "x": 0.55503875,
-                  "y": 0.14166667
-                },
-                {
-                  "x": 0.6728682,
-                  "y": 0.14166667
-                },
-                {
-                  "x": 0.6728682,
-                  "y": 0.26944444
-                },
-                {
-                  "x": 0.55503875,
-                  "y": 0.26944444
-                }
-              ],
-              "vertices": []
-            },
-            "page": "0",
-            "layoutType": 0,
-            "layoutId": "",
-            "confidence": 0.0
-          }
-        ]
-      },
-      "id": "4",
       "mentionId": "",
       "properties": [],
       "redacted": false,

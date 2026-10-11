@@ -4,3 +4,6 @@ backgroundColor = "#F6F6F3"
 secondaryBackgroundColor = "#ECECE7"
 textColor = "#2A2A28"
 primaryColor = "#5B7F75"
+
+[server]
+address = "localhost"   # only this machine can open the screen

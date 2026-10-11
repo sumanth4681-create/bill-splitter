@@ -82,6 +82,31 @@ Runs both readers on each photo (Google reads in parallel with the local reads) 
 items found, items in common, totals, and seconds. On five public receipts the local model read
 every row on all five (Google: three of five) but took 30–55 s versus about 2 s.
 
+## Security notes
+
+Threat model: one person, on their own laptop. Nothing is exposed to the internet.
+
+- **Secrets stay out of git.** The Google key, `.env`, the database, and all saved reader
+  responses are ignored (only `backend/fixtures/sample.json` is committed). The service account
+  has a single role, *Document AI API User*.
+- **Nothing listens beyond this machine.** The backend binds to `127.0.0.1`; the screen is
+  pinned to `localhost` in `.streamlit/config.toml`.
+- **Uploads are checked before any paid call:** JPEG/PNG/WebP/PDF only, 10 MB max, and the
+  bytes must decode as a real image (or start like a PDF).
+- **Saved responses are redacted.** Card-number fragments, the shop's address, and phone number
+  are removed from Google's response (entities and raw text) before it is written to disk.
+  Don't commit other fixtures: they still contain the receipt's item text.
+- **The model is not trusted.** The local reader's JSON is checked by code (summary rows
+  dropped, rows reconciled against the printed subtotal, money parsed as integer cents), and the
+  split math is pure and property-tested, so a receipt that says "ignore your instructions"
+  can't change what anyone owes.
+- **Queries are parameterised**; all ids are integers; fixture file names are SHA-256 hex.
+- Dependencies are pinned and checked with `pip-audit` (clean as of 2026-10-10).
+
+Not done, because this version has no network users: authentication, rate limiting, HTTPS.
+The shareable-link design in `../devpost/spec.md` must add unguessable share tokens, "a friend
+can only claim for themselves", and an upload rate limit (each Google read costs money).
+
 ## What's deliberately not here
 
 One person claims on behalf of everyone from one screen. The shareable-link, multi-device

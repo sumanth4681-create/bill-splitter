@@ -6,6 +6,7 @@ map_expense_document() is pure, so it can be tested on saved responses offline.
 """
 
 import hashlib
+import io
 import json
 import logging
 import os
@@ -37,6 +38,40 @@ class ReaderNotConfigured(Exception):
 
 def image_hash(image_bytes: bytes) -> str:
     return hashlib.sha256(image_bytes).hexdigest()
+
+
+def looks_like_receipt_file(data: bytes, mime_type: str) -> bool:
+    """True if the bytes really are a PDF or a decodable image, whatever the upload claims."""
+    if mime_type == "application/pdf":
+        return data.startswith(b"%PDF")
+    try:
+        from PIL import Image
+
+        Image.open(io.BytesIO(data)).verify()
+        return True
+    except Exception:
+        return False
+
+
+# Entities whose text we never keep on disk. Saved responses are replayed for free, but a
+# card number fragment or the shop's street address has no use in a bill split.
+SENSITIVE_ENTITY_TYPES = {"credit_card_last_four_digits", "supplier_address", "supplier_phone"}
+
+
+def strip_sensitive(doc: documentai.Document) -> documentai.Document:
+    """Drop sensitive entities and blank their characters in the raw text, in place."""
+    text = list(doc.text)
+    keep = []
+    for entity in doc.entities:
+        if entity.type_ in SENSITIVE_ENTITY_TYPES:
+            for seg in entity.text_anchor.text_segments:
+                for i in range(seg.start_index, min(seg.end_index, len(text))):
+                    text[i] = "#"
+        else:
+            keep.append(entity)
+    doc.text = "".join(text)
+    doc.entities = keep
+    return doc
 
 
 READERS = ("docai", "local")
@@ -72,7 +107,7 @@ def read_receipt(image_bytes: bytes, mime_type: str, reader: str = "docai") -> P
     elif os.getenv("OCR_MODE", "live") == "replay":
         raise ReplayMissing("No saved response for this image (OCR_MODE=replay).")
     else:
-        doc = _call_document_ai(image_bytes, mime_type)
+        doc = strip_sensitive(_call_document_ai(image_bytes, mime_type))
         FIXTURES_DIR.mkdir(exist_ok=True)
         fixture.write_text(documentai.Document.to_json(doc))
     return map_expense_document(doc)

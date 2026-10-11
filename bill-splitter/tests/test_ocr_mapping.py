@@ -111,3 +111,19 @@ def test_real_sample_fixture():
         ("Organic Milk", 699), ("Fresh Eggs", 549), ("Ground Beef", 1480),
         ("Bread", 425), ("Apples", 610), ("Pasta", 395)]
     assert (r.tax_cents, r.tip_cents, r.total_cents) == (333, 0, 4491)
+
+
+def test_strip_sensitive_drops_card_and_address_and_blanks_their_text():
+    from backend.ocr import strip_sensitive
+
+    doc = documentai.Document(text="VISA ****1234\n12 Main St\nCoke 2.99", entities=[
+        Entity(type_="credit_card_last_four_digits", mention_text="1234",
+               text_anchor={"text_segments": [{"start_index": 9, "end_index": 13}]}),
+        Entity(type_="supplier_address", mention_text="12 Main St",
+               text_anchor={"text_segments": [{"start_index": 14, "end_index": 24}]}),
+        line("Coke", None, "2.99", 2, 990_000_000),
+    ])
+    strip_sensitive(doc)
+    assert [e.type_ for e in doc.entities] == ["line_item"]
+    assert doc.text == "VISA ****####\n##########\nCoke 2.99"
+

@@ -10,7 +10,22 @@ from google.cloud import documentai
 from backend import ocr
 
 SAMPLE = Path(__file__).parent.parent / "backend" / "fixtures" / "sample.json"
-RECEIPT = b"not really a photo, but its hash points at the saved sample response"
+
+
+def png(width: int) -> bytes:
+    """A real (blank) PNG; different widths give different bytes, hence different hashes."""
+    import io
+
+    from PIL import Image
+
+    out = io.BytesIO()
+    Image.new("RGB", (width, 10), "white").save(out, format="PNG")
+    return out.getvalue()
+
+
+RECEIPT = png(10)   # its hash points at the saved sample response
+BLANK = png(11)     # its saved response has no line items
+UNSEEN = png(12)    # nothing saved for it
 
 
 @pytest.fixture
@@ -21,7 +36,7 @@ def client(tmp_path, monkeypatch):
     shutil.copy(SAMPLE, tmp_path / f"{ocr.image_hash(RECEIPT)}.json")
     # A "receipt" whose saved response has no line items at all.
     empty = documentai.Document(entities=[documentai.Document.Entity(type_="total_amount", mention_text="5.00")])
-    (tmp_path / f"{ocr.image_hash(b'blank')}.json").write_text(documentai.Document.to_json(empty))
+    (tmp_path / f"{ocr.image_hash(BLANK)}.json").write_text(documentai.Document.to_json(empty))
 
     from backend import main
     main.storage.init_db()
@@ -75,9 +90,13 @@ def test_edits_keep_totals_honest(client):
 
 
 def test_error_responses(client):
-    assert upload(client, data=b"blank").status_code == 422          # saved response had no line items
-    assert "clear image" in upload(client, data=b"blank").json()["detail"]
-    assert upload(client, data=b"never seen").status_code == 422     # replay mode, nothing saved
+    assert upload(client, data=BLANK).status_code == 422             # saved response had no line items
+    assert "clear image" in upload(client, data=BLANK).json()["detail"]
+    assert upload(client, data=UNSEEN).status_code == 422            # replay mode, nothing saved
+    assert upload(client, data=b"not an image at all").status_code == 422
+    assert client.post("/bills", files={"image": ("r.gif", RECEIPT, "image/gif")}).status_code == 415
+    big = RECEIPT + b"\0" * (10 * 1024 * 1024)
+    assert client.post("/bills", files={"image": ("r.png", big, "image/png")}).status_code == 413
     assert upload(client, reader="gemini").status_code == 422
     assert client.get("/bills/999").status_code == 404
     bid = upload(client).json()["id"]

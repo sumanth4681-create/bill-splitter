@@ -66,6 +66,8 @@ Build mode: learn (chosen by default on 2026-10-10; learner can switch to fast a
 
 ## Final Review
 
+- [x] Hardening pass (learner request, 2026-10-10): upload size/type/real-image checks before any paid call; Streamlit bound to localhost; `pip-audit` clean; card/address/phone redacted from saved Google responses (and from `sample.json`); README security notes with the threat model and share-link requirements.
+- [ ] Adversarial agent pass: three subagents (API attacker, security code review, split/parser fuzzer) — findings triaged, real ones fixed with regression tests
 - [ ] Final review complete — feedback resolved and learner confirms ready to ship
 
 ## Code Tour and App Map

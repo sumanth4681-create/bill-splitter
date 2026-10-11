@@ -64,11 +64,22 @@ def _bill_detail(bill_id: int) -> BillDetail:
     )
 
 
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
+
+
 @app.post("/bills", response_model=BillDetail, status_code=201)
 async def create_bill(image: UploadFile = File(...), reader: str = Form("docai")) -> BillDetail:
     if reader not in ocr.READERS:
         raise HTTPException(status_code=422, detail=f"reader must be one of {', '.join(ocr.READERS)}.")
-    data = await image.read()
+    mime = image.content_type or ""
+    if mime not in ALLOWED_TYPES:
+        raise HTTPException(status_code=415, detail="Upload a JPEG, PNG, WebP, or PDF.")
+    data = await image.read(MAX_UPLOAD_BYTES + 1)
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="That file is too big (limit 10 MB).")
+    if not ocr.looks_like_receipt_file(data, mime):  # checked before any paid call
+        raise HTTPException(status_code=422, detail="Upload a clear image of the receipt.")
     try:
         parsed = ocr.read_receipt(data, image.content_type or "image/jpeg", reader=reader)
     except ocr_local.LocalReaderUnavailable as exc:
