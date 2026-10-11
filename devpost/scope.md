@@ -29,6 +29,7 @@ The "oh, that's cool" beat: a shared item split between two people while the thi
 
 ## The POC Boundary
 - Real OCR on a receipt photo. Learner prefers **Google OCR** because real receipts are messy (details confirmed in `4-spec`)
+- A second receipt reader using the learner's **local LM Studio model** (Qwen 3.5 9B vision), selectable at upload, plus a side-by-side comparison of both readers on the same receipts (added during the build, 2026-10-10)
 - Editable amounts, so a misread price or the leftover split can be corrected by hand
 - A single screen where one person enters the group's names and claims on behalf of each person
 - Items with unique IDs; one owner or shared among selected people

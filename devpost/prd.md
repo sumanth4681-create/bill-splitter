@@ -28,7 +28,7 @@ Success: every person's amount adds up to the receipt total, and the split match
 ## Screens and Layout
 Two places in the app:
 
-- **Upload** — an image input. After upload: the loading spinner, then the bill opens.
+- **Upload** — an image input and a **Reader** choice (Google Document AI, the default, or the local model). After upload: the loading spinner, then the bill opens.
 - **History** — a list of past bills, each shown by bill name. Clicking one opens that bill.
 
 **The bill view** (opened from Upload or History), top to bottom:
@@ -46,15 +46,18 @@ Two places in the app:
 
 ### Receipt Upload and Reading
 Source: `scope.md > The POC Boundary` (real OCR).
-- Accepts a receipt photo and sends it to Google OCR.
+- Accepts a receipt photo and sends it to the chosen reader: Google OCR (default) or the local LM Studio model.
 - Shows a spinner while it's reading.
 - Produces a list of items, each with a unique ID (so two "Coke" lines stay separate), a name, a quantity, and a price. Tax and tip are captured separately from the items when present.
   - [ ] Uploading a real receipt photo shows the spinner, then a list of items matching the receipt.
   - [ ] Two items with the same name appear as two separate rows that can be claimed independently.
+  - [ ] The same photo read by the local model opens a bill with the same item rows (differences, if any, are visible in the mismatch warning and fixable by editing).
 
 ### Fixing Misreads
 - Quantity and price on each row can be edited to correct OCR errors. This is not claiming part of an item.
+- Tax, tip, and the receipt total can also be edited, because readers sometimes miss a tax line (learner feedback at the slice-2 checkpoint, 2026-10-10).
   - [ ] Editing a price updates the summary amounts immediately.
+  - [ ] Editing tax or tip updates every person's share and clears the mismatch warning when the numbers now agree.
 
 ### People
 - Friends' names are entered above the items when the bill is open.
@@ -116,6 +119,9 @@ Upload with spinner → Google OCR → editable item list with unique IDs → na
 ## Non-Goals
 - In-app payments. The app shows who owes what; money moves outside it.
 - User accounts or login. There is only one payer using the app.
+
+## Added During the Build
+- **Local-model reader (2026-10-10):** a second reader backed by the learner's LM Studio server, with a comparison script that scores both readers on the same receipts (rows matched, totals, time). Evidence so far: on one receipt the local model matched 6/6 items once the photo was enlarged, but took ~20 s vs ~1.6 s and added junk rows that code must filter.
 
 ## Open Questions
 - **Bill name:** who sets it? *Assumption: defaults to the restaurant name or upload date, and can be edited.* Can wait for spec.

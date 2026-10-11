@@ -36,3 +36,12 @@ def create_bill(filename: str, data: bytes, mime_type: str) -> dict:
 
 def get_bill(bill_id: int) -> dict:
     return _request("GET", f"/bills/{bill_id}")
+
+
+def set_people(bill_id: int, names: list[str]) -> dict:
+    return _request("PUT", f"/bills/{bill_id}/people", json={"names": names})
+
+
+def set_claim(bill_id: int, item_id: int, person_id: int, claimed: bool) -> dict:
+    return _request("PUT", f"/bills/{bill_id}/claims",
+                    json={"item_id": item_id, "person_id": person_id, "claimed": claimed})

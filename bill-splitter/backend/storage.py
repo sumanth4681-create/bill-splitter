@@ -100,3 +100,38 @@ def get_bill_rows(bill_id: int) -> dict | None:
         "people": [dict(r) for r in people],
         "claims": [dict(r) for r in claims],
     }
+
+
+def replace_people(bill_id: int, names: list[str]) -> None:
+    """Set the bill's people to `names` in order. People whose name is unchanged keep
+    their id (and claims); removed people lose their claims; new names are added."""
+    wanted = []
+    for raw in names:
+        name = " ".join(raw.split())
+        if name and name.lower() not in {w.lower() for w in wanted}:
+            wanted.append(name)
+    with connect() as conn:
+        existing = {r["name"].lower(): r["id"] for r in conn.execute(
+            "SELECT id, name FROM people WHERE bill_id = ?", (bill_id,))}
+        keep = {existing[n.lower()] for n in wanted if n.lower() in existing}
+        gone = [pid for pid in existing.values() if pid not in keep]
+        if gone:
+            marks = ",".join("?" * len(gone))
+            conn.execute(f"DELETE FROM claims WHERE person_id IN ({marks})", gone)
+            conn.execute(f"DELETE FROM people WHERE id IN ({marks})", gone)
+        for pos, name in enumerate(wanted):
+            if name.lower() in existing:
+                conn.execute("UPDATE people SET position = ?, name = ? WHERE id = ?",
+                             (pos, name, existing[name.lower()]))
+            else:
+                conn.execute("INSERT INTO people (bill_id, position, name) VALUES (?, ?, ?)",
+                             (bill_id, pos, name))
+
+
+def set_claim(item_id: int, person_id: int, claimed: bool) -> None:
+    with connect() as conn:
+        if claimed:
+            conn.execute("INSERT OR IGNORE INTO claims (item_id, person_id) VALUES (?, ?)",
+                         (item_id, person_id))
+        else:
+            conn.execute("DELETE FROM claims WHERE item_id = ? AND person_id = ?", (item_id, person_id))

@@ -41,6 +41,7 @@ Steps 5–9 are all local: Streamlit → localhost → SQLite → `split.py`. Th
 | Contracts | [Pydantic](https://docs.pydantic.dev/) (comes with FastAPI) | Request/response shapes are the module contracts |
 | Receipt reading | [Google Document AI, Expense Parser](https://cloud.google.com/document-ai/docs/processors-list#processor_expense-parser) via [`google-cloud-documentai`](https://cloud.google.com/python/docs/reference/documentai/latest) | Learner's choice: real receipt OCR with structured line items. Accepted tradeoff: about $0.10 per receipt, billing required, more setup than Gemini |
 | Storage | SQLite (Python's built-in `sqlite3`) | Learner's choice: relational data (claims link items to people) in one file |
+| Local receipt reading | [LM Studio](https://lmstudio.ai/) local server (OpenAI-compatible, `localhost:1234`) running `qwen/qwen3.5-9b` (vision) | Learner's addition: free, offline second reader to compare against Document AI. Accepted tradeoff: ~20 s per receipt, needs LM Studio running |
 | HTTP from Streamlit | [`requests`](https://requests.readthedocs.io/) | Simple calls to the local API |
 | Image upload to FastAPI | `python-multipart` | Required for FastAPI file uploads |
 | Tests | [pytest](https://docs.pytest.org/) | Module tests against varied inputs |
@@ -59,7 +60,7 @@ python -m pip install -r requirements.txt
 cp .env.example .env   # fill in values locally, never paste them into chat
 ```
 
-`.env` keys: `GOOGLE_APPLICATION_CREDENTIALS` (path to the key file), `DOCAI_PROJECT_ID`, `DOCAI_LOCATION` (e.g. `us`), `DOCAI_PROCESSOR_ID`, `OCR_MODE` (`live` or `replay`), `API_URL` (default `http://localhost:8000`).
+`.env` keys: `GOOGLE_APPLICATION_CREDENTIALS` (path to the key file), `DOCAI_PROJECT_ID`, `DOCAI_LOCATION` (e.g. `us`), `DOCAI_PROCESSOR_ID`, `OCR_MODE` (`live` or `replay`), `API_URL` (default `http://localhost:8000`), `LMSTUDIO_URL` (default `http://localhost:1234/v1`), `LMSTUDIO_MODEL` (default `qwen/qwen3.5-9b`).
 
 Run (two terminals, from `bill-splitter/`):
 ```bash
@@ -100,7 +101,7 @@ Thin functions that wrap each endpoint (`create_bill(image)`, `get_bill(id)`, `s
 | `POST /bills` | multipart `image` | `BillDetail` (201), or 422 `{"detail": "Upload a clear image of the receipt."}` | Receipt Upload and Reading |
 | `GET /bills` | — | `list[BillListItem]` (id, name, created_at), newest first | History |
 | `GET /bills/{id}` | — | `BillDetail` | History |
-| `PATCH /bills/{id}` | `{name}` | `BillDetail` | Screens and Layout (bill name) |
+| `PATCH /bills/{id}` | `{name?, tax_cents?, tip_cents?, receipt_total_cents?}` | `BillDetail` | Screens and Layout (bill name), Fixing Misreads (tax/tip/total) |
 | `PATCH /bills/{id}/items/{item_id}` | `{quantity?, price_cents?}` | `BillDetail` | Fixing Misreads |
 | `PUT /bills/{id}/people` | `{names: [str]}` | `BillDetail` | People |
 | `PUT /bills/{id}/claims` | `{item_id, person_id, claimed: bool}` | `BillDetail` | Claiming Items |
@@ -121,12 +122,24 @@ Pydantic models shared by all modules:
 All money is **integer cents** to avoid floating-point errors.
 
 ### Receipt Reader (`backend/ocr.py`)
-`read_receipt(image_bytes: bytes, mime_type: str) -> ParsedReceipt`
+`read_receipt(image_bytes: bytes, mime_type: str, reader: str = "docai") -> ParsedReceipt`
+
+Two readers behind one function. `reader="docai"` is below; `reader="local"` delegates to `backend/ocr_local.py` (see **Local Reader**). Both save-and-replay under `fixtures/{reader}-{hash}.json` and return the same `ParsedReceipt`, so nothing downstream knows which one ran.
 1. `key = sha256(image_bytes)`. If `fixtures/{key}.json` exists, load it (replay). If not and `OCR_MODE=replay`, raise `ReplayMissing`.
 2. Otherwise, call Document AI `process_document` with `RawDocument(content, mime_type)` on the Expense processor, then save the response JSON to `fixtures/{key}.json`.
 3. `map_expense_document(doc) -> ParsedReceipt` is a **separate pure function**, so it can be tested on saved fixtures without the network. Each `line_item` entity becomes one `ParsedItem` (description, quantity defaulting to 1, amount → cents). `total_tax_amount` becomes tax, `total_amount` becomes total, and `supplier_name` becomes merchant.
 4. No line items found → raise `UnreadableReceipt`. The API turns that into the 422 "Upload a clear image" message.
 PRD ref: `prd.md > Receipt Upload and Reading`.
+
+### Local Reader (`backend/ocr_local.py`)
+`read_receipt_local(image_bytes, mime_type) -> ParsedReceipt`, built from the 2026-10-10 prompt evaluation:
+1. **Upscale** images narrower than ~1200 px (Pillow) — the model misread $6.99 as $6.59 at 645 px and got 6/6 at 1290 px.
+2. POST to `{LMSTUDIO_URL}/chat/completions` with a rules system prompt (items are purchased products only; copy printed digits; null when unreadable; `/no_think`), the image as a data URL, `temperature=0`, and a strict JSON schema `{merchant, items:[{name, quantity, price}], subtotal, tax, tip, total}`.
+3. Read the JSON from `content`, falling back to `reasoning_content` (LM Studio sometimes puts the answer there), and parse it with a regex for the outermost `{...}`.
+4. **Code-side cleanup**, because the model ignores "stop at SUBTOTAL": drop rows whose name is a summary label (subtotal/tax/tip/total/balance/change/cash/card); if a printed subtotal exists, keep the longest prefix of rows whose sum equals it, dropping anything after.
+5. Map to `ParsedReceipt` (cents via `Decimal`), raising `UnreadableReceipt` when no items remain and `LocalReaderUnavailable` when LM Studio isn't reachable (API → 503 "Local model isn't running. Start LM Studio's server.").
+
+`scripts/compare_readers.py <image>...` runs both readers on each image and prints a table: items found, items in common, subtotal/tax/total per reader, seconds. Results go in the README as the comparison evidence.
 
 ### Split Logic (`backend/split.py`)
 `compute_split(items, people, claims, tax_cents, tip_cents, overrides: dict[person_id, cents] | None, receipt_total_cents) -> Summary` is **pure**: no I/O, deterministic.
@@ -145,7 +158,7 @@ Required tests (`tests/test_split.py`): solo claim; a shared item between 2 of 3
 **Subagent experiment:** this module is built by a subagent given *only* this section plus the `Contracts` section, not the conversation or the other docs. See `Decisions and Open Issues`.
 
 ### Storage (`backend/storage.py`)
-Functions: `init_db()`, `create_bill(parsed, image_hash) -> id`, `list_bills()`, `get_bill_rows(id)`, `rename_bill`, `update_item`, `replace_people(id, names)`, `set_claim(item_id, person_id, claimed)`, `set_override(person_id, amount_cents|None)`. Uses `sqlite3` with foreign keys on, writing to `data/bills.db`.
+Functions: `init_db()`, `create_bill(parsed, image_hash) -> id`, `list_bills()`, `get_bill_rows(id)`, `update_bill(id, name?, tax_cents?, tip_cents?, receipt_total_cents?)`, `update_item`, `replace_people(id, names)`, `set_claim(item_id, person_id, claimed)`, `set_override(person_id, amount_cents|None)`. Uses `sqlite3` with foreign keys on, writing to `data/bills.db`.
 PRD ref: `prd.md > History`, `prd.md > States and Boundaries` (persistence).
 
 ### Future: Shareable Link (designed, not built)
@@ -186,16 +199,20 @@ learn-ai-basics-main/
 │   ├── backend/
 │   │   ├── main.py               # FastAPI app + endpoints, request timing log
 │   │   ├── models.py             # Pydantic contracts shared by all modules
-│   │   ├── ocr.py                # Document AI call, save/replay, map_expense_document()
+│   │   ├── ocr.py                # read_receipt() dispatcher; Document AI call, save/replay, map_expense_document()
+│   │   ├── ocr_local.py          # LM Studio (local Qwen) reader: upscale, prompt, JSON cleanup
 │   │   ├── split.py              # pure split math (subagent experiment)
 │   │   ├── storage.py            # SQLite functions
 │   │   └── fixtures/             # saved Document AI responses (gitignored, except one sample)
 │   ├── frontend/
 │   │   ├── app.py                # Streamlit: Upload, History, bill view
 │   │   └── api_client.py         # calls to the backend
+│   ├── scripts/
+│   │   └── compare_readers.py    # Document AI vs local model on the same receipts
 │   ├── tests/
 │   │   ├── test_split.py         # split rules + "always sums to total"
 │   │   ├── test_ocr_mapping.py   # map_expense_document() on a saved fixture
+│   │   ├── test_ocr_local.py     # local-reader JSON cleanup + mapping (no model needed)
 │   │   └── test_api.py           # endpoints with FastAPI TestClient, OCR in replay mode
 │   ├── .streamlit/config.toml    # muted theme
 │   ├── data/                     # bills.db lives here (gitignored)
@@ -216,8 +233,20 @@ learn-ai-basics-main/
 - **Cost:** about $0.10 per receipt (≤10 pages). No free tier was found. Save-and-replay keeps repeat tests free.
 - **Speed:** unverified. Expect a few seconds per receipt, and we'll measure it.
 
+### LM Studio (local model)
+- Learner's machine runs LM Studio with `qwen/qwen3.5-9b` (vision, 9B, 262k context). Start the server with `lms server start` (port 1234). No key, no cost.
+- **Comparison on 4 public receipts (Wikimedia Commons, 2026-10-10), Document AI vs local Qwen 3.5 9B (upscaled to ≥1400 px, rules prompt, temperature 0, one run each):**
+  | Receipt | Document AI | Local Qwen |
+  |---|---|---|
+  | Umami Tapas (scan, 10 items, GST + liquor tax) | 1.5 s · 8/10 names, 10/10 prices · tax missed | 46.6 s · 10/10 · tax 6.23 (missed 2.00 liquor tax) |
+  | Pizza Chicago (phone photo, 13 items, gratuity) | 2.3 s · 3/13 names, 10/13 prices, tax off 1¢ | 53.0 s · 13/13 · tax, tip, total all correct |
+  | Tesco 1994 (faint, quantity prefixes, £) | 1.5 s · 5/10 names, 8/10 prices | 32.4 s · 10/10 |
+  | Save Mart (1 item) | 1.7 s · 1/1 | 29.2 s · 1/1 |
+  Local read items better on 3/4; Google is 20–35× faster; both missed a tax line once. Gaps in this evidence: only one messy phone photo, no discount rows, no qty×price rows, single run per receipt.
+- Measured 2026-10-10 on one 645×360 receipt photo: ~17–24 s per read (52 s cold); 5/6 items at native size, 6/6 at 2× upscale; junk rows (summary labels, garbled footer text) in every run regardless of prompt; the detailed rules prompt did not beat a bare prompt on accuracy. Thinking mode added time without improving results.
+
 ### Python packages
-`fastapi`, `uvicorn`, `python-multipart`, `pydantic`, `google-cloud-documentai`, `streamlit`, `requests`, `python-dotenv`, `pytest`, `httpx` (for FastAPI's TestClient). Pin versions in `requirements.txt` at install time.
+`fastapi`, `uvicorn`, `python-multipart`, `pydantic`, `google-cloud-documentai`, `streamlit`, `requests`, `python-dotenv`, `pytest`, `httpx` (for FastAPI's TestClient), `Pillow` (upscaling for the local reader). Pin versions in `requirements.txt` at install time.
 
 ## Important Failure Modes
 - **Blurry photo or not a receipt** (no line items) → a 422 from the API, and Streamlit shows "Upload a clear image of the receipt" with the uploader still available. (`prd.md > States and Boundaries`)
@@ -243,6 +272,7 @@ learn-ai-basics-main/
 - SQLite for storage.
 - Run locally and record. No deployment.
 - Build `split.py` via a subagent with only its contract (learning goal: orchestration and lean context).
+- Add a second, local-model receipt reader (LM Studio / Qwen 3.5 9B) alongside Document AI and compare them on real receipts (added 2026-10-10 after a live test of the local model).
 
 **Implementation details derived from those (agent)**
 - Money stored as integer cents. The rounding rule gives extra cents to the first people in name order.

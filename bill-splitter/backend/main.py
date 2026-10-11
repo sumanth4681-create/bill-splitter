@@ -5,10 +5,11 @@ import time
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from pydantic import BaseModel
 
 load_dotenv()
 
-from backend import ocr, storage  # noqa: E402  (after .env is loaded)
+from backend import ocr, split, storage  # noqa: E402  (after .env is loaded)
 from backend.models import BillDetail, Claim, Item, Person, Summary  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
@@ -28,15 +29,16 @@ async def time_requests(request: Request, call_next):
 
 
 def _summary(rows: dict) -> Summary:
-    # Placeholder until split.py exists: totals only, no per-person shares.
     bill = rows["bill"]
-    items_total = sum(r["price_cents"] for r in rows["items"])
-    return Summary(
-        people=[],
-        items_total_cents=items_total,
+    return split.compute_split(
+        items=[Item(id=r["id"], name=r["name"], quantity=r["quantity"], price_cents=r["price_cents"])
+               for r in rows["items"]],
+        people=[Person(id=r["id"], name=r["name"]) for r in rows["people"]],
+        claims=[Claim(**r) for r in rows["claims"]],
+        tax_cents=bill["tax_cents"],
+        tip_cents=bill["tip_cents"],
+        overrides={r["id"]: r["override_cents"] for r in rows["people"] if r["override_cents"] is not None},
         receipt_total_cents=bill["receipt_total_cents"],
-        computed_total_cents=items_total + bill["tax_cents"] + bill["tip_cents"],
-        matches_receipt=items_total + bill["tax_cents"] + bill["tip_cents"] == bill["receipt_total_cents"],
     )
 
 
@@ -77,4 +79,30 @@ async def create_bill(image: UploadFile = File(...)) -> BillDetail:
 
 @app.get("/bills/{bill_id}", response_model=BillDetail)
 def get_bill(bill_id: int) -> BillDetail:
+    return _bill_detail(bill_id)
+
+
+class PeopleIn(BaseModel):
+    names: list[str]
+
+
+class ClaimIn(BaseModel):
+    item_id: int
+    person_id: int
+    claimed: bool
+
+
+@app.put("/bills/{bill_id}/people", response_model=BillDetail)
+def put_people(bill_id: int, body: PeopleIn) -> BillDetail:
+    _bill_detail(bill_id)  # 404 if missing
+    storage.replace_people(bill_id, body.names)
+    return _bill_detail(bill_id)
+
+
+@app.put("/bills/{bill_id}/claims", response_model=BillDetail)
+def put_claim(bill_id: int, body: ClaimIn) -> BillDetail:
+    detail = _bill_detail(bill_id)
+    if body.item_id not in {i.id for i in detail.items} or body.person_id not in {p.id for p in detail.people}:
+        raise HTTPException(status_code=404, detail="That item or person isn't on this bill.")
+    storage.set_claim(body.item_id, body.person_id, body.claimed)
     return _bill_detail(bill_id)
