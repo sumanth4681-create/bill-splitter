@@ -48,6 +48,8 @@ class PersonShare(BaseModel):
     lines: list[ShareLine]
     tax_cents: int
     tip_cents: int
+    discount_cents: int = 0    # this person's share of the bill-level discount (positive number, subtracted)
+    difference_cents: int = 0  # this person's share of (receipt total - everything else); keeps totals honest
     computed_cents: int
     final_cents: int
     edited: bool
@@ -58,7 +60,8 @@ class Summary(BaseModel):
     items_total_cents: int
     receipt_total_cents: int
     computed_total_cents: int
-    matches_receipt: bool
+    difference_cents: int = 0   # receipt total - (items + tax + tip - discount); 0 when the rows are right
+    matches_receipt: bool       # True when difference_cents == 0
 
 
 class BillListItem(BaseModel):
@@ -73,6 +76,7 @@ class BillDetail(BaseModel):
     created_at: str
     tax_cents: int
     tip_cents: int
+    discount_cents: int = 0
     receipt_total_cents: int
     items: list[Item]
     people: list[Person]

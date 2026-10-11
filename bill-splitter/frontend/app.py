@@ -69,7 +69,8 @@ def save_bill_name(bill_id: int) -> None:
 
 
 def save_amounts(bill_id: int) -> None:
-    fields = {k: to_cents(st.session_state[f"{k}_{bill_id}"]) for k in ("tax_cents", "tip_cents", "receipt_total_cents")}
+    fields = {k: to_cents(st.session_state[f"{k}_{bill_id}"])
+              for k in ("tax_cents", "tip_cents", "discount_cents", "receipt_total_cents")}
     _call(lambda: api_client.update_bill(bill_id, **fields), "Saved")
 
 
@@ -119,9 +120,11 @@ def summary_section(bill: dict) -> None:
         return
     st.markdown("**Who owes what**")
     if not summary["matches_receipt"]:
+        diff = summary["difference_cents"]
         st.warning(
-            f"Items + tax + tip = {money(summary['computed_total_cents'])}, receipt says "
-            f"{money(summary['receipt_total_cents'])}. Check for a misread row."
+            f"Items + tax + tip − discount = {money(summary['receipt_total_cents'] - diff)}, receipt says "
+            f"{money(summary['receipt_total_cents'])}. The {money(abs(diff))} difference is split equally "
+            f"so the totals still add up to what was paid. Check for a misread row."
         )
     for share in summary["people"]:
         with st.container(border=True):
@@ -144,10 +147,12 @@ def summary_section(bill: dict) -> None:
                 label.caption(f"{line['item_name']}{note}")
                 with amt:
                     right(f"<small>{money(line['share_cents'])}</small>")
-            for name, cents in (("Tax", share["tax_cents"]), ("Tip", share["tip_cents"])):
+            for name, cents in (("Tax share", share["tax_cents"]), ("Tip share", share["tip_cents"]),
+                                ("Discount share", -share["discount_cents"]),
+                                ("Receipt difference", share["difference_cents"])):
                 if cents:
                     label, amt = st.columns([6, 2])
-                    label.caption(f"{name} share")
+                    label.caption(name)
                     with amt:
                         right(f"<small>{money(cents)}</small>")
 
@@ -181,12 +186,15 @@ def items_section(bill: dict, person: dict | None) -> None:
             name_col.caption(", ".join(claimers))
 
     st.divider()
-    st.caption("Tax, tip, and the receipt total can be corrected here if the reader missed a line.")
-    tax_col, tip_col, total_col = st.columns(3)
+    st.caption("Tax, tip, discount, and the receipt total can be corrected here if the reader missed a line.")
+    tax_col, tip_col, disc_col, total_col = st.columns(4)
     with tax_col:
         money_input("Tax", f"tax_cents_{bill['id']}", bill["tax_cents"], save_amounts, (bill["id"],), min_value=0.0)
     with tip_col:
         money_input("Tip", f"tip_cents_{bill['id']}", bill["tip_cents"], save_amounts, (bill["id"],), min_value=0.0)
+    with disc_col:
+        money_input("Discount", f"discount_cents_{bill['id']}", bill["discount_cents"], save_amounts, (bill["id"],),
+                    min_value=0.0, help="Taken off the bill and split equally")
     with total_col:
         money_input("Receipt total", f"receipt_total_cents_{bill['id']}", bill["receipt_total_cents"], save_amounts,
                     (bill["id"],), min_value=0.0)

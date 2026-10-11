@@ -142,7 +142,7 @@ PRD ref: `prd.md > Receipt Upload and Reading`.
 `scripts/compare_readers.py <image>...` runs both readers on each image and prints a table: items found, items in common, subtotal/tax/total per reader, seconds. Results go in the README as the comparison evidence.
 
 ### Split Logic (`backend/split.py`)
-`compute_split(items, people, claims, tax_cents, tip_cents, overrides: dict[person_id, cents] | None, receipt_total_cents) -> Summary` is **pure**: no I/O, deterministic.
+`compute_split(items, people, claims, tax_cents, tip_cents, overrides: dict[person_id, cents] | None, receipt_total_cents, discount_cents=0) -> Summary` is **pure**: no I/O, deterministic.
 
 Rules (from `prd.md > Claiming Items`, `prd.md > Split Summary`):
 1. **Claimed item:** its `price_cents` is divided equally among the people who claimed it. Unclaimers pay nothing for it.
@@ -150,8 +150,9 @@ Rules (from `prd.md > Claiming Items`, `prd.md > Split Summary`):
 3. **Tax and tip:** each divided equally among all people.
 4. **Rounding:** to divide `amount` among `n` people, each gets `amount // n`, and `amount % n` people get 1 extra cent. Who gets the extra cent rotates across the bill's divisions (items, then tax, then tip), so no one is always rounded up. The sum always equals the original amount exactly.
 5. `computed_cents` = sum of the person's lines + tax share + tip share. `final_cents` = the override if one is set (`edited: true`), otherwise `computed_cents`.
-6. `matches_receipt` = (sum of `computed_cents` == `receipt_total_cents`). Overrides don't affect this check.
-7. **No people:** returns `people: []`. The screen shows "Add names to start claiming."
+6. **Discount:** a bill-level `discount_cents` is divided equally among all people and subtracted.
+7. **Receipt difference:** `difference = receipt_total − (items + tax + tip − discount)`. It is divided equally among all people (can be negative) so that the sum of `computed_cents` **always equals `receipt_total_cents`**, which is what was actually paid. `matches_receipt` = (`difference == 0`). Overrides don't affect this check.
+8. **No people:** returns `people: []`, with `difference_cents` still computed. The screen shows "Add names to start claiming."
 
 Required tests (`tests/test_split.py`): solo claim; a shared item between 2 of 3 (third pays 0); an unclaimed item spread across 3; $10.00 split 3 ways (334/333/333); tax and tip split; an override sets `final_cents` but leaves `matches_receipt` intact; no people; same-name items with different IDs kept separate; and **for any input, the sum of computed amounts equals items + tax + tip.**
 
@@ -173,7 +174,7 @@ SQLite, `data/bills.db`:
 
 ```
 bills   (id INTEGER PK, name TEXT, created_at TEXT, image_hash TEXT,
-         tax_cents INT, tip_cents INT, receipt_total_cents INT)
+         tax_cents INT, tip_cents INT, discount_cents INT, receipt_total_cents INT)
 items   (id INTEGER PK, bill_id → bills.id, position INT,
          name TEXT, quantity INT, price_cents INT)
 people  (id INTEGER PK, bill_id → bills.id, position INT, name TEXT,

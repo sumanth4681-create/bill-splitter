@@ -76,7 +76,8 @@ Source: `scope.md > The Unique Kernel`.
 Source: `scope.md > What "Working" Looks Like`.
 - One block per person: name, their items (with their share of shared items), and the total they owe the payer.
 - Unclaimed items are split equally across everyone and clearly labeled as unclaimed in the summary.
-- Tax and tip are split equally by default.
+- Tax and tip are split equally by default. A bill-level discount (entered by hand) comes off everyone equally.
+- **The amounts always add up to the receipt total**, because that is what the payer actually paid. If the rows don't add up to it (a misread), the difference is split equally as a visible "Receipt difference" line and a warning asks the payer to check for a misread row. (Learner decision at the slice-4 checkpoint, 2026-10-10.)
 - Each person's final amount can be edited at the end.
   - [ ] The sum of all people's amounts equals the receipt total (before any manual edits).
   - [ ] An unclaimed item appears in the summary labeled as unclaimed and spread across all people.

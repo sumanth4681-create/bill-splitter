@@ -39,6 +39,7 @@ def _summary(rows: dict) -> Summary:
         tip_cents=bill["tip_cents"],
         overrides={r["id"]: r["override_cents"] for r in rows["people"] if r["override_cents"] is not None},
         receipt_total_cents=bill["receipt_total_cents"],
+        discount_cents=bill["discount_cents"],
     )
 
 
@@ -53,6 +54,7 @@ def _bill_detail(bill_id: int) -> BillDetail:
         created_at=bill["created_at"],
         tax_cents=bill["tax_cents"],
         tip_cents=bill["tip_cents"],
+        discount_cents=bill["discount_cents"],
         receipt_total_cents=bill["receipt_total_cents"],
         items=[Item(id=r["id"], name=r["name"], quantity=r["quantity"], price_cents=r["price_cents"])
                for r in rows["items"]],
@@ -116,6 +118,7 @@ class BillIn(BaseModel):
     name: str | None = None
     tax_cents: int | None = None
     tip_cents: int | None = None
+    discount_cents: int | None = None
     receipt_total_cents: int | None = None
 
 
@@ -134,10 +137,11 @@ def patch_bill(bill_id: int, body: BillIn) -> BillDetail:
     _bill_detail(bill_id)
     if body.name is not None and not body.name.strip():
         raise HTTPException(status_code=422, detail="Bill name can't be empty.")
-    if any(v is not None and v < 0 for v in (body.tax_cents, body.tip_cents, body.receipt_total_cents)):
+    if any(v is not None and v < 0 for v in (body.tax_cents, body.tip_cents, body.discount_cents, body.receipt_total_cents)):
         raise HTTPException(status_code=422, detail="Amounts can't be negative.")
     storage.update_bill(bill_id, name=body.name.strip() if body.name else None, tax_cents=body.tax_cents,
-                        tip_cents=body.tip_cents, receipt_total_cents=body.receipt_total_cents)
+                        tip_cents=body.tip_cents, discount_cents=body.discount_cents,
+                        receipt_total_cents=body.receipt_total_cents)
     return _bill_detail(bill_id)
 
 

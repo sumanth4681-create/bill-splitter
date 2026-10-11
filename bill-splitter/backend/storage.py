@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS bills (
     image_hash TEXT,
     tax_cents INTEGER NOT NULL DEFAULT 0,
     tip_cents INTEGER NOT NULL DEFAULT 0,
+    discount_cents INTEGER NOT NULL DEFAULT 0,
     receipt_total_cents INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS items (
@@ -58,6 +59,10 @@ def connect() -> sqlite3.Connection:
 def init_db() -> None:
     with connect() as conn:
         conn.executescript(SCHEMA)
+        # Bills created before the discount field existed get the column added in place.
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(bills)")}
+        if "discount_cents" not in columns:
+            conn.execute("ALTER TABLE bills ADD COLUMN discount_cents INTEGER NOT NULL DEFAULT 0")
 
 
 def create_bill(parsed: ParsedReceipt, image_hash: str) -> int:
@@ -145,11 +150,11 @@ def _update(conn: sqlite3.Connection, table: str, row_id: int, fields: dict) -> 
     conn.execute(f"UPDATE {table} SET {assignments} WHERE id = ?", (*changes.values(), row_id))
 
 
-def update_bill(bill_id: int, name: str | None = None, tax_cents: int | None = None,
-                tip_cents: int | None = None, receipt_total_cents: int | None = None) -> None:
+def update_bill(bill_id: int, name: str | None = None, tax_cents: int | None = None, tip_cents: int | None = None,
+                discount_cents: int | None = None, receipt_total_cents: int | None = None) -> None:
     with connect() as conn:
         _update(conn, "bills", bill_id, {"name": name, "tax_cents": tax_cents, "tip_cents": tip_cents,
-                                         "receipt_total_cents": receipt_total_cents})
+                                         "discount_cents": discount_cents, "receipt_total_cents": receipt_total_cents})
 
 
 def update_item(item_id: int, quantity: int | None = None, price_cents: int | None = None) -> None:

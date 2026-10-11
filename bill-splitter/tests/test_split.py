@@ -72,6 +72,23 @@ def test_no_people():
     assert s.computed_total_cents == 550 and s.matches_receipt  # receipt check still works before names exist
 
 
+def test_receipt_difference_is_shared_so_totals_always_match_what_was_paid():
+    # Milk misread as 8.99 (really 6.99): rows say 10.00 + 1.00 tax, receipt says 9.00.
+    s = compute_split([item(1, 899), item(2, 101)], people(2), [], 100, 0, {}, receipt_total_cents=900)
+    assert s.difference_cents == -200 and not s.matches_receipt
+    assert [p.difference_cents for p in s.people] == [-100, -100]
+    assert sum(p.computed_cents for p in s.people) == 900 == s.computed_total_cents
+
+
+def test_discount_comes_off_everyone_equally_and_rounds_exactly():
+    s = compute_split([item(1, 1000)], people(3), [], 0, 0, {}, receipt_total_cents=700, discount_cents=300)
+    assert [p.discount_cents for p in s.people] == [100, 100, 100]
+    assert sum(p.computed_cents for p in s.people) == 700 and s.matches_receipt
+    s = compute_split([item(1, 1000)], people(3), [], 0, 0, {}, receipt_total_cents=899, discount_cents=101)
+    assert sum(p.discount_cents for p in s.people) == 101
+    assert sum(p.computed_cents for p in s.people) == 899
+
+
 def test_same_name_items_kept_separate():
     items = [item(1, 300, "Taco"), item(2, 500, "Taco")]
     claims = [Claim(item_id=1, person_id=1), Claim(item_id=2, person_id=2)]
@@ -80,7 +97,7 @@ def test_same_name_items_kept_separate():
     assert [(l.item_id, l.share_cents) for l in by_id(s, 2).lines] == [(2, 500)]
 
 
-def test_mismatched_receipt_total():
+def test_mismatched_receipt_total_is_flagged():
     s = compute_split([item(1, 1000)], people(2), [], 0, 0, {}, receipt_total_cents=1100)
     assert s.matches_receipt is False
 
@@ -100,6 +117,14 @@ def test_sum_always_equals_items_tax_tip():
         assert sum(p.computed_cents for p in s.people) == expected
         assert s.computed_total_cents == expected
         assert s.matches_receipt
+        # With a discount and a receipt total that disagrees with the rows, the shares must
+        # still add up to exactly what was paid.
+        discount = rng.randint(0, 2000)
+        paid = max(expected - discount + rng.randint(-500, 500), 0)
+        s = compute_split(items, ppl, claims, tax, tip, {}, receipt_total_cents=paid, discount_cents=discount)
+        assert sum(p.computed_cents for p in s.people) == paid == s.computed_total_cents
+        assert sum(p.discount_cents for p in s.people) == discount
+        assert s.matches_receipt == (paid == expected - discount)
         for it in items:
             assert sum(l.share_cents for p in s.people for l in p.lines if l.item_id == it.id) == it.price_cents
 
