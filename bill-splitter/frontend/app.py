@@ -19,6 +19,11 @@ def money(cents: int) -> str:
     return f"{sign}${abs(cents) / 100:,.2f}"
 
 
+def md_money(cents: int) -> str:
+    """Money for Markdown contexts (warnings, captions): Streamlit reads $...$ as a formula."""
+    return money(cents).replace("$", "\\$")
+
+
 def right(text: str) -> None:
     st.markdown(f"<div style='text-align:right'>{text}</div>", unsafe_allow_html=True)
 
@@ -71,6 +76,12 @@ def save_bill_name(bill_id: int) -> None:
 def save_amounts(bill_id: int) -> None:
     fields = {k: to_cents(st.session_state[f"{k}_{bill_id}"])
               for k in ("tax_cents", "tip_cents", "discount_cents", "receipt_total_cents")}
+    # A discount lowers what was paid, so changing it moves the receipt total by the same amount
+    # (unless the receipt total was edited in the same save).
+    was = st.session_state.get(f"saved_amounts_{bill_id}", {})
+    discount_delta = fields["discount_cents"] - was.get("discount_cents", fields["discount_cents"])
+    if discount_delta and fields["receipt_total_cents"] == was.get("receipt_total_cents"):
+        fields["receipt_total_cents"] = max(fields["receipt_total_cents"] - discount_delta, 0)
     _call(lambda: api_client.update_bill(bill_id, **fields), "Saved")
 
 
@@ -122,8 +133,8 @@ def summary_section(bill: dict) -> None:
     if not summary["matches_receipt"]:
         diff = summary["difference_cents"]
         st.warning(
-            f"Items + tax + tip − discount = {money(summary['receipt_total_cents'] - diff)}, receipt says "
-            f"{money(summary['receipt_total_cents'])}. The {money(abs(diff))} difference is split equally "
+            f"Items + tax + tip − discount = {md_money(summary['receipt_total_cents'] - diff)}, receipt says "
+            f"{md_money(summary['receipt_total_cents'])}. The {md_money(abs(diff))} difference is split equally "
             f"so the totals still add up to what was paid. Check for a misread row."
         )
     for share in summary["people"]:
@@ -134,7 +145,7 @@ def summary_section(bill: dict) -> None:
                 money_input("Owes", f"final_{share['person_id']}", share["final_cents"], save_override,
                             (bill["id"], share["person_id"], share["name"]), label_visibility="collapsed")
             if share["edited"]:
-                head.caption(f"Set by hand (calculated: {money(share['computed_cents'])})")
+                head.caption(f"Set by hand (calculated: {md_money(share['computed_cents'])})")
                 head.button("Recalculate", key=f"reset_{share['person_id']}", on_click=clear_override,
                             args=(bill["id"], share["person_id"], share["name"]))
             for line in share["lines"]:
@@ -186,7 +197,10 @@ def items_section(bill: dict, person: dict | None) -> None:
             name_col.caption(", ".join(claimers))
 
     st.divider()
-    st.caption("Tax, tip, discount, and the receipt total can be corrected here if the reader missed a line.")
+    st.caption("Tax, tip, and the receipt total can be corrected here if the reader missed a line. "
+               "A discount comes off the receipt total and is split equally.")
+    st.session_state[f"saved_amounts_{bill['id']}"] = {"discount_cents": bill["discount_cents"],
+                                                       "receipt_total_cents": bill["receipt_total_cents"]}
     tax_col, tip_col, disc_col, total_col = st.columns(4)
     with tax_col:
         money_input("Tax", f"tax_cents_{bill['id']}", bill["tax_cents"], save_amounts, (bill["id"],), min_value=0.0)
@@ -194,7 +208,7 @@ def items_section(bill: dict, person: dict | None) -> None:
         money_input("Tip", f"tip_cents_{bill['id']}", bill["tip_cents"], save_amounts, (bill["id"],), min_value=0.0)
     with disc_col:
         money_input("Discount", f"discount_cents_{bill['id']}", bill["discount_cents"], save_amounts, (bill["id"],),
-                    min_value=0.0, help="Taken off the bill and split equally")
+                    min_value=0.0, help="Lowers the receipt total by the same amount; split equally")
     with total_col:
         money_input("Receipt total", f"receipt_total_cents_{bill['id']}", bill["receipt_total_cents"], save_amounts,
                     (bill["id"],), min_value=0.0)
