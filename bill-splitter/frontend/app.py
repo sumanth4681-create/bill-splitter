@@ -19,6 +19,14 @@ def money(cents: int) -> str:
     return f"{sign}${abs(cents) / 100:,.2f}"
 
 
+_MD_SPECIALS = "\\`*_{}[]()#+-.!$<>~|"
+
+
+def md_escape(text: str) -> str:
+    """Names come from receipts and typed input; never let them act as Markdown."""
+    return "".join("\\" + ch if ch in _MD_SPECIALS else ch for ch in text)
+
+
 def md_money(cents: int) -> str:
     """Money for Markdown contexts (warnings, captions): Streamlit reads $...$ as a formula."""
     return money(cents).replace("$", "\\$")
@@ -137,10 +145,14 @@ def summary_section(bill: dict) -> None:
             f"{md_money(summary['receipt_total_cents'])}. The {md_money(abs(diff))} difference is split equally "
             f"so the totals still add up to what was paid. Check for a misread row."
         )
+    final_total = sum(p["final_cents"] for p in summary["people"])
+    if any(p["edited"] for p in summary["people"]) and final_total != summary["receipt_total_cents"]:
+        st.caption(f"Hand-set amounts add up to {md_money(final_total)}; the receipt was "
+                   f"{md_money(summary['receipt_total_cents'])}.")
     for share in summary["people"]:
         with st.container(border=True):
             head, total = st.columns([6, 2])
-            head.markdown(f"**{share['name']}**")
+            head.markdown(f"**{md_escape(share['name'])}**")
             with total:
                 money_input("Owes", f"final_{share['person_id']}", share["final_cents"], save_override,
                             (bill["id"], share["person_id"], share["name"]), label_visibility="collapsed")
@@ -155,7 +167,7 @@ def summary_section(bill: dict) -> None:
                 elif line["split_ways"] > 1:
                     note = f" · shared {line['split_ways']} ways"
                 label, amt = st.columns([6, 2])
-                label.caption(f"{line['item_name']}{note}")
+                label.caption(f"{md_escape(line['item_name'])}{note}")
                 with amt:
                     right(f"<small>{money(line['share_cents'])}</small>")
             for name, cents in (("Tax share", share["tax_cents"]), ("Tip share", share["tip_cents"]),
@@ -182,7 +194,7 @@ def items_section(bill: dict, person: dict | None) -> None:
             st.session_state[key] = person["id"] in {c["person_id"] for c in bill["claims"] if c["item_id"] == item["id"]}
             tick.checkbox("claim", key=key, label_visibility="collapsed", on_change=toggle_claim,
                           args=(bill["id"], item["id"], person["id"], person["name"], item["name"]))
-        name_col.write(item["name"])
+        name_col.markdown(md_escape(item["name"]))
         qty_col.write(f"×{item['quantity']}")
         with price_col:
             right(money(item["price_cents"]))
@@ -194,7 +206,7 @@ def items_section(bill: dict, person: dict | None) -> None:
             st.button("Save", key=f"save_{item['id']}", on_click=save_item, args=(bill["id"], item["id"]))
         claimers = claims_by_item.get(item["id"])
         if claimers:
-            name_col.caption(", ".join(claimers))
+            name_col.caption(md_escape(", ".join(claimers)))
 
     st.divider()
     st.caption("Tax, tip, and the receipt total can be corrected here if the reader missed a line. "

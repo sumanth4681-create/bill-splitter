@@ -16,8 +16,13 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from google.cloud import documentai
+from PIL import Image
 
 from backend.models import ParsedItem, ParsedReceipt
+
+# A 20 KB PNG can claim 13000x13000 pixels; Pillow refuses anything over 2x this at decode time.
+Image.MAX_IMAGE_PIXELS = 12_500_000
+ALLOWED_IMAGE_FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP"}
 
 log = logging.getLogger("bill_splitter.ocr")
 
@@ -41,15 +46,15 @@ def image_hash(image_bytes: bytes) -> str:
 
 
 def looks_like_receipt_file(data: bytes, mime_type: str) -> bool:
-    """True if the bytes really are a PDF or a decodable image, whatever the upload claims."""
+    """True if the bytes really are a PDF, or an image whose format matches the declared type."""
     if mime_type == "application/pdf":
         return data.startswith(b"%PDF")
     try:
-        from PIL import Image
-
-        Image.open(io.BytesIO(data)).verify()
-        return True
-    except Exception:
+        with Image.open(io.BytesIO(data)) as img:
+            fmt = img.format
+            img.verify()
+        return fmt == ALLOWED_IMAGE_FORMATS.get(mime_type)
+    except Exception:  # not an image, truncated, or a decompression bomb
         return False
 
 
@@ -59,7 +64,15 @@ SENSITIVE_ENTITY_TYPES = {"credit_card_last_four_digits", "supplier_address", "s
 
 
 def strip_sensitive(doc: documentai.Document) -> documentai.Document:
-    """Drop sensitive entities and blank their characters in the raw text, in place."""
+    """Make a Document safe to keep on disk, in place: drop the embedded page images and
+    layout detail (the photo itself lives there), drop sensitive entities, and blank their
+    characters in the raw text. Mapping only needs entities + text positions."""
+    for page in doc.pages:
+        page.image = documentai.Document.Page.Image()
+        for field in ("blocks", "paragraphs", "lines", "tokens", "symbols", "tables", "form_fields",
+                      "visual_elements", "detected_barcodes"):
+            setattr(page, field, [])
+    doc.uri = ""
     text = list(doc.text)
     keep = []
     for entity in doc.entities:

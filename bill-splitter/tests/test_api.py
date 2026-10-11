@@ -103,3 +103,33 @@ def test_error_responses(client):
     assert client.put(f"/bills/{bid}/claims", json={"item_id": 1, "person_id": 999, "claimed": True}).status_code == 404
     assert client.patch(f"/bills/{bid}", json={"name": " "}).status_code == 422
     assert client.patch(f"/bills/{bid}", json={"discount_cents": -1}).status_code == 422
+
+
+def test_bounds_reject_overflow_coercion_and_oversized_input(client):
+    bid = upload(client).json()["id"]
+    client.put(f"/bills/{bid}/people", json={"names": ["Sam"]})
+    item = client.get(f"/bills/{bid}").json()["items"][0]["id"]
+    sam = client.get(f"/bills/{bid}").json()["people"][0]["id"]
+    assert client.patch(f"/bills/{bid}", json={"tax_cents": 2**63}).status_code == 422       # was a 500
+    assert client.patch(f"/bills/{bid}/items/{item}", json={"price_cents": 2**70}).status_code == 422
+    assert client.put(f"/bills/{bid}/overrides", json={"person_id": sam, "amount_cents": 2**63}).status_code == 422
+    assert client.patch(f"/bills/{bid}", json={"tax_cents": True}).status_code == 422          # strict ints
+    assert client.patch(f"/bills/{bid}", json={"tax_cents": "5"}).status_code == 422
+    assert client.patch(f"/bills/{bid}", json={"name": "x" * 100_000}).status_code == 422
+    assert client.put(f"/bills/{bid}/people", json={"names": ["p"] * 10_000}).status_code == 422
+    assert client.put(f"/bills/{bid}/people", json={"names": ["x" * 500]}).status_code == 422
+    assert client.get(f"/bills/{2**63}").status_code == 422
+    assert client.patch(f"/bills/{bid}/items/{item}", json={"price_cents": -300}).status_code == 200  # discount row
+    assert client.patch(f"/bills/{bid}/items/{item}", json={"price_cents": -(10**12)}).status_code == 422
+    assert client.get(f"/bills/{bid}").json()["summary"]["matches_receipt"] is not None  # still healthy
+
+
+def test_cross_site_browser_post_is_refused_but_local_tools_work(client):
+    assert upload(client).status_code == 201                                   # no Origin: curl, requests, Streamlit
+    ok = client.post("/bills", files={"image": ("r.png", RECEIPT, "image/png")}, data={"reader": "docai"},
+                     headers={"Origin": "http://localhost:8000"})               # the API's own /docs page
+    assert ok.status_code == 201
+    evil = client.post("/bills", files={"image": ("r.png", RECEIPT, "image/png")}, data={"reader": "docai"},
+                       headers={"Origin": "https://evil.example"})
+    assert evil.status_code == 403
+

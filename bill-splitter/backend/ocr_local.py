@@ -25,6 +25,9 @@ log = logging.getLogger("bill_splitter.ocr_local")
 
 MIN_WIDTH = 1200
 TARGET_WIDTH = 1400
+MAX_WIDTH = 2400          # anything wider is downscaled: smaller request, no memory spike
+MAX_CENTS = 1_000_000_000  # a model "price" beyond this is noise, not a receipt row
+MAX_QUANTITY = 10_000
 
 SYSTEM_PROMPT = """You extract structured data from a photo of a shopping or restaurant receipt.
 Rules:
@@ -70,9 +73,9 @@ def prepare_image(image_bytes: bytes, mime_type: str) -> bytes:
     except UnidentifiedImageError as exc:
         raise UnreadableReceipt("The local reader needs a photo (JPEG or PNG).") from exc
     img = img.convert("RGB")
-    if img.width < MIN_WIDTH:
-        scale = TARGET_WIDTH / img.width
-        img = img.resize((TARGET_WIDTH, round(img.height * scale)), Image.LANCZOS)
+    if img.width < MIN_WIDTH or img.width > MAX_WIDTH:
+        target = TARGET_WIDTH if img.width < MIN_WIDTH else MAX_WIDTH
+        img = img.resize((target, round(img.height * target / img.width)), Image.LANCZOS)
     out = io.BytesIO()
     img.save(out, format="PNG")
     return out.getvalue()
@@ -126,11 +129,17 @@ def extract_json(text: str) -> dict:
 # ---------- pure mapping ----------
 
 def _cents(value) -> int | None:
-    if value is None:
+    if value is None or isinstance(value, bool) or not isinstance(value, (int, float, str)):
         return None
     try:
-        return int((Decimal(str(value)) * 100).quantize(Decimal("1")))
+        amount = Decimal(str(value).replace("$", "").replace(",", "").strip())
     except InvalidOperation:
+        return None
+    if not amount.is_finite():
+        return None
+    try:
+        return int((amount * 100).quantize(Decimal("1")))
+    except InvalidOperation:  # absurd exponents
         return None
 
 
@@ -150,11 +159,13 @@ def map_local_response(data: dict) -> ParsedReceipt:
     rows = []
     for raw in data.get("items") or []:
         price = _cents(raw.get("price"))
-        if price is None:
+        if price is None or abs(price) > MAX_CENTS:
             continue
-        name = " ".join(str(raw.get("name") or "").split()) or "Item"
-        qty = raw.get("quantity") or 1
-        rows.append((name, qty if isinstance(qty, int) and qty > 0 else 1, price))
+        name = " ".join(str(raw.get("name") or "").split())[:200] or "Item"
+        qty = raw.get("quantity")
+        if isinstance(qty, bool) or not isinstance(qty, int) or not 1 <= qty <= MAX_QUANTITY:
+            qty = 1
+        rows.append((name, qty, price))
 
     subtotal = _cents(data.get("subtotal"))
     rows = clean_rows(rows, subtotal)

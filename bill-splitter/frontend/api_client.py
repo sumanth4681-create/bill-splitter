@@ -16,22 +16,34 @@ class ApiError(Exception):
     """The backend answered with an error; str(exc) is its message."""
 
 
-def _request(method: str, path: str, **kwargs) -> dict | list:
+READ_TIMEOUT = 180  # the local model can take a minute; everything else answers in milliseconds
+
+
+def _request(method: str, path: str, timeout: int = 30, **kwargs) -> dict | list:
     try:
-        resp = requests.request(method, f"{API_URL}{path}", timeout=60, **kwargs)
+        resp = requests.request(method, f"{API_URL}{path}", timeout=timeout, **kwargs)
     except requests.ConnectionError as exc:
         raise BackendUnavailable(START_HINT) from exc
+    except requests.Timeout as exc:
+        raise ApiError("The backend is taking too long. If this was a receipt read, check History in a "
+                       "moment: the bill may still appear.") from exc
+    except requests.RequestException as exc:
+        raise ApiError(f"Request failed: {type(exc).__name__}") from exc
     if not resp.ok:
         try:
             detail = resp.json().get("detail", resp.text)
         except ValueError:
             detail = resp.text
-        raise ApiError(detail)
+        if isinstance(detail, list):  # FastAPI validation errors: [{loc, msg, ...}, ...]
+            detail = "; ".join(f"{'.'.join(str(p) for p in e.get('loc', [])[1:]) or 'input'}: {e.get('msg', '')}"
+                               for e in detail)
+        raise ApiError(str(detail))
     return resp.json()
 
 
 def create_bill(filename: str, data: bytes, mime_type: str, reader: str = "docai") -> dict:
-    return _request("POST", "/bills", files={"image": (filename, data, mime_type)}, data={"reader": reader})
+    return _request("POST", "/bills", timeout=READ_TIMEOUT, files={"image": (filename, data, mime_type)},
+                    data={"reader": reader})
 
 
 def get_bill(bill_id: int) -> dict:

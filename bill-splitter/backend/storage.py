@@ -117,6 +117,7 @@ def replace_people(bill_id: int, names: list[str]) -> None:
         if name and name.lower() not in {w.lower() for w in wanted}:
             wanted.append(name)
     with connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")  # read-then-write: hold the write lock from the start
         existing = {r["name"].lower(): r["id"] for r in conn.execute(
             "SELECT id, name FROM people WHERE bill_id = ?", (bill_id,))}
         keep = {existing[n.lower()] for n in wanted if n.lower() in existing}

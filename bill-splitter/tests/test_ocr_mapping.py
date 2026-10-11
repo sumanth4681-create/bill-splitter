@@ -127,3 +127,30 @@ def test_strip_sensitive_drops_card_and_address_and_blanks_their_text():
     assert [e.type_ for e in doc.entities] == ["line_item"]
     assert doc.text == "VISA ****####\n##########\nCoke 2.99"
 
+
+def test_strip_sensitive_removes_the_embedded_page_image_and_layout():
+    from backend.ocr import strip_sensitive
+
+    doc = documentai.Document(text="Coke 2.99", entities=[line("Coke", None, "2.99", 2, 990_000_000)],
+                              pages=[{"page_number": 1, "image": {"content": b"\x89PNG fake photo bytes"},
+                                      "tokens": [{"layout": {}}], "lines": [{"layout": {}}]}])
+    strip_sensitive(doc)
+    assert doc.pages[0].image.content == b"" and len(doc.pages[0].tokens) == 0 and len(doc.pages[0].lines) == 0
+    assert map_expense_document(doc).items[0].price_cents == 299  # mapping still works on the stripped doc
+
+
+def test_upload_check_rejects_format_mismatch_and_decompression_bomb():
+    import io
+
+    from PIL import Image
+
+    from backend.ocr import looks_like_receipt_file
+
+    png = io.BytesIO(); Image.new("RGB", (10, 10)).save(png, format="PNG")
+    assert looks_like_receipt_file(png.getvalue(), "image/png")
+    assert not looks_like_receipt_file(png.getvalue(), "image/jpeg")       # declared type must match the bytes
+    assert not looks_like_receipt_file(b"GIF89a....", "image/png")
+    bomb = io.BytesIO(); Image.new("1", (13_000, 13_000)).save(bomb, format="PNG")  # ~20 KB, 169 MP
+    assert len(bomb.getvalue()) < 100_000 and not looks_like_receipt_file(bomb.getvalue(), "image/png")
+    assert looks_like_receipt_file(b"%PDF-1.4 ...", "application/pdf")
+

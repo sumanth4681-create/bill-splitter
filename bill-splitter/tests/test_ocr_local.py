@@ -84,3 +84,17 @@ def test_read_receipt_local_replays_saved_fixture(tmp_path, monkeypatch):
     assert r.merchant == "Cafe" and r.items[0].price_cents == 250 and r.total_cents == 275
     with pytest.raises(ocr.ReplayMissing):
         ocr.read_receipt(png_bytes(11, 11), "image/png", reader="local")
+
+
+def test_absurd_model_values_are_ignored_not_crashed():
+    data = {"merchant": None, "items": [
+        {"name": "Soup", "quantity": True, "price": "$4.50"},          # bool qty -> 1; "$" tolerated
+        {"name": "Huge", "quantity": 1, "price": 1e308},                # noise, dropped
+        {"name": "NaN", "quantity": 1, "price": float("nan")},         # dropped
+        {"name": "Inf", "quantity": 1, "price": "inf"},                # dropped
+        {"name": "List", "quantity": 1, "price": [1, 2]},              # dropped
+        {"name": "Big qty", "quantity": 10**12, "price": 1.0}],        # qty clamped to 1
+        "subtotal": None, "tax": None, "tip": None, "total": None}
+    r = map_local_response(data)
+    assert [(i.name, i.quantity, i.price_cents) for i in r.items] == [("Soup", 1, 450), ("Big qty", 1, 100)]
+
