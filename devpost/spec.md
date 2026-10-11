@@ -70,6 +70,8 @@ streamlit run frontend/app.py          # opens http://localhost:8501
 
 **For the demo video:** upload a real receipt (live call), add three names, claim one item solo, share one item between two people, leave one unclaimed, show that the summary adds up to the receipt total, edit one final amount, then open the bill from History.
 **Submission:** the short demo video plus a public GitHub repo. The repo must not contain `.env`, the key file, or `bills.db`.
+- **Public repository (published 2026-10-10):** https://github.com/sumanth4681-create/bill-splitter — tag `v0.1-submission` marks the submitted version; later work goes on branches.
+- **Demo video:** _(URL to be added once uploaded)_
 
 ## Look and Feel
 From `prd.md > Look and Feel`: **interactive, not vibrant.**
