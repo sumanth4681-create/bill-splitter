@@ -135,3 +135,29 @@ def set_claim(item_id: int, person_id: int, claimed: bool) -> None:
                          (item_id, person_id))
         else:
             conn.execute("DELETE FROM claims WHERE item_id = ? AND person_id = ?", (item_id, person_id))
+
+
+def _update(conn: sqlite3.Connection, table: str, row_id: int, fields: dict) -> None:
+    changes = {k: v for k, v in fields.items() if v is not None}
+    if not changes:
+        return
+    assignments = ", ".join(f"{k} = ?" for k in changes)
+    conn.execute(f"UPDATE {table} SET {assignments} WHERE id = ?", (*changes.values(), row_id))
+
+
+def update_bill(bill_id: int, name: str | None = None, tax_cents: int | None = None,
+                tip_cents: int | None = None, receipt_total_cents: int | None = None) -> None:
+    with connect() as conn:
+        _update(conn, "bills", bill_id, {"name": name, "tax_cents": tax_cents, "tip_cents": tip_cents,
+                                         "receipt_total_cents": receipt_total_cents})
+
+
+def update_item(item_id: int, quantity: int | None = None, price_cents: int | None = None) -> None:
+    with connect() as conn:
+        _update(conn, "items", item_id, {"quantity": quantity, "price_cents": price_cents})
+
+
+def set_override(person_id: int, amount_cents: int | None) -> None:
+    """A person's hand-edited final amount; None clears it."""
+    with connect() as conn:
+        conn.execute("UPDATE people SET override_cents = ? WHERE id = ?", (amount_cents, person_id))

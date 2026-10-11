@@ -110,3 +110,54 @@ def put_claim(bill_id: int, body: ClaimIn) -> BillDetail:
         raise HTTPException(status_code=404, detail="That item or person isn't on this bill.")
     storage.set_claim(body.item_id, body.person_id, body.claimed)
     return _bill_detail(bill_id)
+
+
+class BillIn(BaseModel):
+    name: str | None = None
+    tax_cents: int | None = None
+    tip_cents: int | None = None
+    receipt_total_cents: int | None = None
+
+
+class ItemIn(BaseModel):
+    quantity: int | None = None
+    price_cents: int | None = None
+
+
+class OverrideIn(BaseModel):
+    person_id: int
+    amount_cents: int | None
+
+
+@app.patch("/bills/{bill_id}", response_model=BillDetail)
+def patch_bill(bill_id: int, body: BillIn) -> BillDetail:
+    _bill_detail(bill_id)
+    if body.name is not None and not body.name.strip():
+        raise HTTPException(status_code=422, detail="Bill name can't be empty.")
+    if any(v is not None and v < 0 for v in (body.tax_cents, body.tip_cents, body.receipt_total_cents)):
+        raise HTTPException(status_code=422, detail="Amounts can't be negative.")
+    storage.update_bill(bill_id, name=body.name.strip() if body.name else None, tax_cents=body.tax_cents,
+                        tip_cents=body.tip_cents, receipt_total_cents=body.receipt_total_cents)
+    return _bill_detail(bill_id)
+
+
+@app.patch("/bills/{bill_id}/items/{item_id}", response_model=BillDetail)
+def patch_item(bill_id: int, item_id: int, body: ItemIn) -> BillDetail:
+    detail = _bill_detail(bill_id)
+    if item_id not in {i.id for i in detail.items}:
+        raise HTTPException(status_code=404, detail="That item isn't on this bill.")
+    if body.quantity is not None and body.quantity < 1:
+        raise HTTPException(status_code=422, detail="Quantity must be at least 1.")
+    storage.update_item(item_id, quantity=body.quantity, price_cents=body.price_cents)
+    return _bill_detail(bill_id)
+
+
+@app.put("/bills/{bill_id}/overrides", response_model=BillDetail)
+def put_override(bill_id: int, body: OverrideIn) -> BillDetail:
+    detail = _bill_detail(bill_id)
+    if body.person_id not in {p.id for p in detail.people}:
+        raise HTTPException(status_code=404, detail="That person isn't on this bill.")
+    if body.amount_cents is not None and body.amount_cents < 0:
+        raise HTTPException(status_code=422, detail="Amounts can't be negative.")
+    storage.set_override(body.person_id, body.amount_cents)
+    return _bill_detail(bill_id)

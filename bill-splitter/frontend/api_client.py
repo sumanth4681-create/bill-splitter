@@ -45,3 +45,15 @@ def set_people(bill_id: int, names: list[str]) -> dict:
 def set_claim(bill_id: int, item_id: int, person_id: int, claimed: bool) -> dict:
     return _request("PUT", f"/bills/{bill_id}/claims",
                     json={"item_id": item_id, "person_id": person_id, "claimed": claimed})
+
+
+def update_bill(bill_id: int, **fields) -> dict:
+    return _request("PATCH", f"/bills/{bill_id}", json=fields)
+
+
+def update_item(bill_id: int, item_id: int, **fields) -> dict:
+    return _request("PATCH", f"/bills/{bill_id}/items/{item_id}", json=fields)
+
+
+def set_override(bill_id: int, person_id: int, amount_cents: int | None) -> dict:
+    return _request("PUT", f"/bills/{bill_id}/overrides", json={"person_id": person_id, "amount_cents": amount_cents})

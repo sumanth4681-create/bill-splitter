@@ -50,6 +50,50 @@ def toggle_claim(bill_id: int, item_id: int, person_id: int, person_name: str, i
     st.toast(f"{'Claimed' if claimed else 'Unclaimed'} {item_name} for {person_name}")
 
 
+def to_cents(dollars: float) -> int:
+    return round(dollars * 100)
+
+
+def _call(action, toast: str) -> None:
+    try:
+        action()
+    except (api_client.BackendUnavailable, api_client.ApiError) as exc:
+        st.session_state.flash_error = str(exc)
+        return
+    st.toast(toast)
+
+
+def save_bill_name(bill_id: int) -> None:
+    name = st.session_state[f"name_{bill_id}"]
+    _call(lambda: api_client.update_bill(bill_id, name=name), "Renamed")
+
+
+def save_amounts(bill_id: int) -> None:
+    fields = {k: to_cents(st.session_state[f"{k}_{bill_id}"]) for k in ("tax_cents", "tip_cents", "receipt_total_cents")}
+    _call(lambda: api_client.update_bill(bill_id, **fields), "Saved")
+
+
+def save_item(bill_id: int, item_id: int) -> None:
+    qty = int(st.session_state[f"qty_{item_id}"])
+    price = to_cents(st.session_state[f"price_{item_id}"])
+    _call(lambda: api_client.update_item(bill_id, item_id, quantity=qty, price_cents=price), "Row updated")
+
+
+def save_override(bill_id: int, person_id: int, name: str) -> None:
+    cents = to_cents(st.session_state[f"final_{person_id}"])
+    _call(lambda: api_client.set_override(bill_id, person_id, cents), f"{name}'s amount set by hand")
+
+
+def clear_override(bill_id: int, person_id: int, name: str) -> None:
+    _call(lambda: api_client.set_override(bill_id, person_id, None), f"{name}'s amount recalculated")
+
+
+def money_input(label: str, key: str, cents: int, on_change, args, **kwargs):
+    """A dollars number box whose state is refreshed from the bill on every rerun."""
+    st.session_state[key] = cents / 100
+    return st.number_input(label, key=key, step=0.01, format="%.2f", on_change=on_change, args=args, **kwargs)
+
+
 # ---------- bill view ----------
 
 def people_section(bill: dict) -> dict | None:
@@ -84,7 +128,12 @@ def summary_section(bill: dict) -> None:
             head, total = st.columns([6, 2])
             head.markdown(f"**{share['name']}**")
             with total:
-                right(f"**{money(share['final_cents'])}**" + (" ✎" if share["edited"] else ""))
+                money_input("Owes", f"final_{share['person_id']}", share["final_cents"], save_override,
+                            (bill["id"], share["person_id"], share["name"]), label_visibility="collapsed")
+            if share["edited"]:
+                head.caption(f"Set by hand (calculated: {money(share['computed_cents'])})")
+                head.button("Recalculate", key=f"reset_{share['person_id']}", on_click=clear_override,
+                            args=(bill["id"], share["person_id"], share["name"]))
             for line in share["lines"]:
                 note = ""
                 if line["unclaimed"]:
@@ -111,7 +160,7 @@ def items_section(bill: dict, person: dict | None) -> None:
         claims_by_item.setdefault(c["item_id"], []).append(by_person.get(c["person_id"], "?"))
 
     for item in bill["items"]:
-        tick, name_col, qty_col, price_col = st.columns([1, 5, 1, 2])
+        tick, name_col, qty_col, price_col, edit_col = st.columns([1, 5, 1, 2, 1])
         if person is not None:
             key = f"claim_{item['id']}_{person['id']}"
             st.session_state[key] = person["id"] in {c["person_id"] for c in bill["claims"] if c["item_id"] == item["id"]}
@@ -121,20 +170,31 @@ def items_section(bill: dict, person: dict | None) -> None:
         qty_col.write(f"×{item['quantity']}")
         with price_col:
             right(money(item["price_cents"]))
+        with edit_col.popover("✎", help="Fix a misread quantity or price"):
+            st.session_state[f"qty_{item['id']}"] = item["quantity"]
+            st.number_input("Quantity", key=f"qty_{item['id']}", min_value=1, step=1)
+            st.session_state[f"price_{item['id']}"] = item["price_cents"] / 100
+            st.number_input("Price (line total)", key=f"price_{item['id']}", step=0.01, format="%.2f")
+            st.button("Save", key=f"save_{item['id']}", on_click=save_item, args=(bill["id"], item["id"]))
         claimers = claims_by_item.get(item["id"])
         if claimers:
             name_col.caption(", ".join(claimers))
 
     st.divider()
-    for label, cents in (("Tax", bill["tax_cents"]), ("Tip", bill["tip_cents"])):
-        label_col, price_col = st.columns([7, 2])
-        label_col.write(label)
-        with price_col:
-            right(money(cents))
+    st.caption("Tax, tip, and the receipt total can be corrected here if the reader missed a line.")
+    tax_col, tip_col, total_col = st.columns(3)
+    with tax_col:
+        money_input("Tax", f"tax_cents_{bill['id']}", bill["tax_cents"], save_amounts, (bill["id"],), min_value=0.0)
+    with tip_col:
+        money_input("Tip", f"tip_cents_{bill['id']}", bill["tip_cents"], save_amounts, (bill["id"],), min_value=0.0)
+    with total_col:
+        money_input("Receipt total", f"receipt_total_cents_{bill['id']}", bill["receipt_total_cents"], save_amounts,
+                    (bill["id"],), min_value=0.0)
 
 
 def show_bill(bill: dict) -> None:
-    st.subheader(bill["name"])
+    st.session_state[f"name_{bill['id']}"] = bill["name"]
+    st.text_input("Bill name", key=f"name_{bill['id']}", on_change=save_bill_name, args=(bill["id"],))
     st.caption(f"Receipt total {money(bill['receipt_total_cents'])}")
     flash = st.session_state.pop("flash_error", None)
     if flash:

@@ -39,7 +39,7 @@ Build mode: learn (chosen by default on 2026-10-10; learner can switch to fast a
   Learner check: On Upload, choose Local model, upload the grocery receipt, and compare the item list with the Google version of the same receipt. Then run the comparison script and say which reader you'd trust, and why.
   Commit: `Add a local-model receipt reader and a reader comparison`
 
-- [ ] **4. Fix misreads and adjust final amounts**
+- [x] **4. Fix misreads and adjust final amounts**
   Becomes usable: You can rename the bill, edit a row's quantity or price to fix an OCR mistake, edit the tax, tip, and receipt total (readers miss tax lines), and edit any person's final amount. The summary updates immediately, edited amounts are marked, and a warning shows when items + tax + tip don't match the receipt total.
   Why now: Real OCR will misread something; once claiming works, correcting the input and the output is what makes the split trustworthy. It depends on the summary from slice 2.
   PRD ref: `prd.md > Fixing Misreads`, `prd.md > Split Summary` (editable final amount), `prd.md > Screens and Layout` (bill name)
