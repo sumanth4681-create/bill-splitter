@@ -29,7 +29,7 @@ Build mode: learn (chosen by default on 2026-10-10; learner can switch to fast a
   Learner check: Open a bill, add three names, claim one item for one person, share one item between two people, leave one unclaimed, and check that the summary reads right and adds up to the receipt total.
   Commit: `Claim and share items with a live per-person split`
 
-- [ ] **3. Read a receipt with the local model, and compare it with Google**
+- [x] **3. Read a receipt with the local model, and compare it with Google**
   Becomes usable: The Upload tab has a Reader choice: Google Document AI (default) or Local model (LM Studio). Picking Local reads the same photo with your Qwen model, free and offline, and opens a bill the same way. A script runs both readers on the same receipts and prints a comparison (items found, items in common, totals, seconds) for the README.
   Why now: You asked to try an LLM reader and keep both. Doing it right after claiming means the comparison can run on real bills while the editing and History slices are still open to change. The reader sits behind the same `read_receipt()` contract, so nothing downstream changes.
   PRD ref: `prd.md > Receipt Upload and Reading`, `prd.md > Added During the Build`
@@ -89,3 +89,6 @@ Activity mode: [live app and editor, explicit static fallback, focused alternati
 - A missing tax/tip is derived only from the printed subtotal (`net_amount`) → total gap, never as `total − items − tax` — the first live receipt had no tax entity, and the old fallback turned an $8.82 misread into "tip", making the mismatch warning impossible to trigger.
 - Added slice 3 (local LM Studio reader + reader comparison) and renumbered the old 3–4 to 4–5 — the learner asked to try an LLM reader and keep both; a live probe of the local Qwen 3.5 9B showed it can read the sample receipt (6/6 items at 2× upscale) but needs code-side cleanup of junk rows, which is now part of the slice's design. Scope, PRD, and spec updated in the same pass.
 - Tax, tip, and receipt total become editable in slice 4 — learner feedback at the slice-2 checkpoint; the reader comparison showed both readers miss a tax line sometimes, so without this a bill could never be made to match its receipt.
+- With no people on a bill, the summary now reports items + tax + tip as the computed total so `matches_receipt` is meaningful before names are added — the API showed `matches: false` on every fresh bill, which was misleading.
+- Known limit of the subtotal-gap rule: when a receipt has two tax lines and a reader returns only one, the remainder is labelled tip (Umami: $2.00 liquor tax shows as tip). Totals still agree; editing tax/tip in slice 4 is the fix.
+- Comparison through the app's own readers (5 receipts, 2026-10-10): local model got every row on all 5 (Google: 3 of 5), at 30–55 s vs ~2 s live. Google reads replay instantly after the first run; the script runs Google in parallel with the local reads.

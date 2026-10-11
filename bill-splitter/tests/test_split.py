@@ -66,9 +66,10 @@ def test_override_sets_final_but_not_match():
 
 
 def test_no_people():
-    s = compute_split([item(1, 500)], [], [], 50, 0, {})
+    s = compute_split([item(1, 500)], [], [], 50, 0, {}, receipt_total_cents=550)
     assert s.people == []
     assert s.items_total_cents == 500
+    assert s.computed_total_cents == 550 and s.matches_receipt  # receipt check still works before names exist
 
 
 def test_same_name_items_kept_separate():

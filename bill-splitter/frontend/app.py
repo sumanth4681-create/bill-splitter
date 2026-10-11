@@ -146,12 +146,17 @@ def show_bill(bill: dict) -> None:
 
 # ---------- tabs ----------
 
+READERS = {"Google Document AI (about 2 seconds)": "docai", "Local model via LM Studio (about half a minute)": "local"}
+
+
 def upload_tab() -> None:
     photo = st.file_uploader("Receipt photo", type=["jpg", "jpeg", "png", "webp", "pdf"])
+    reader = READERS[st.selectbox("Reader", list(READERS), key="reader_choice")]
     if photo is not None and st.button("Read receipt", type="primary"):
-        with st.spinner("Reading the receipt…"):
+        wait = "Reading the receipt…" if reader == "docai" else "Reading with the local model… this takes a while"
+        with st.spinner(wait):
             try:
-                bill = api_client.create_bill(photo.name, photo.getvalue(), photo.type or "image/jpeg")
+                bill = api_client.create_bill(photo.name, photo.getvalue(), photo.type or "image/jpeg", reader)
             except (api_client.BackendUnavailable, api_client.ApiError) as exc:
                 show_error(exc)
                 return

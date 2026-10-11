@@ -30,8 +30,8 @@ def _request(method: str, path: str, **kwargs) -> dict | list:
     return resp.json()
 
 
-def create_bill(filename: str, data: bytes, mime_type: str) -> dict:
-    return _request("POST", "/bills", files={"image": (filename, data, mime_type)})
+def create_bill(filename: str, data: bytes, mime_type: str, reader: str = "docai") -> dict:
+    return _request("POST", "/bills", files={"image": (filename, data, mime_type)}, data={"reader": reader})
 
 
 def get_bill(bill_id: int) -> dict:

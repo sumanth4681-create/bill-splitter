@@ -22,8 +22,10 @@ def compute_split(
     items_total = sum(item.price_cents for item in items)
     receipt_total = items_total + tax_cents + tip_cents if receipt_total_cents is None else receipt_total_cents
     if not people:
+        # Nobody owes anything yet, but the receipt check is still meaningful.
+        computed = items_total + tax_cents + tip_cents
         return Summary(people=[], items_total_cents=items_total, receipt_total_cents=receipt_total,
-                       computed_total_cents=0, matches_receipt=receipt_total == 0)
+                       computed_total_cents=computed, matches_receipt=computed == receipt_total)
 
     person_ids = [p.id for p in people]
     claimers: dict[int, set[int]] = {}

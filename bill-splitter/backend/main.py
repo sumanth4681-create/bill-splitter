@@ -4,12 +4,12 @@ import logging
 import time
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
 load_dotenv()
 
-from backend import ocr, split, storage  # noqa: E402  (after .env is loaded)
+from backend import ocr, ocr_local, split, storage  # noqa: E402  (after .env is loaded)
 from backend.models import BillDetail, Claim, Item, Person, Summary  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
@@ -63,10 +63,14 @@ def _bill_detail(bill_id: int) -> BillDetail:
 
 
 @app.post("/bills", response_model=BillDetail, status_code=201)
-async def create_bill(image: UploadFile = File(...)) -> BillDetail:
+async def create_bill(image: UploadFile = File(...), reader: str = Form("docai")) -> BillDetail:
+    if reader not in ocr.READERS:
+        raise HTTPException(status_code=422, detail=f"reader must be one of {', '.join(ocr.READERS)}.")
     data = await image.read()
     try:
-        parsed = ocr.read_receipt(data, image.content_type or "image/jpeg")
+        parsed = ocr.read_receipt(data, image.content_type or "image/jpeg", reader=reader)
+    except ocr_local.LocalReaderUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
     except ocr.UnreadableReceipt:
         raise HTTPException(status_code=422, detail="Upload a clear image of the receipt.")
     except ocr.ReplayMissing as exc:

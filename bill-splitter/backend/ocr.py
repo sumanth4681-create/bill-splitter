@@ -6,6 +6,7 @@ map_expense_document() is pure, so it can be tested on saved responses offline.
 """
 
 import hashlib
+import json
 import logging
 import os
 import re
@@ -38,7 +39,32 @@ def image_hash(image_bytes: bytes) -> str:
     return hashlib.sha256(image_bytes).hexdigest()
 
 
-def read_receipt(image_bytes: bytes, mime_type: str) -> ParsedReceipt:
+READERS = ("docai", "local")
+
+
+def read_receipt(image_bytes: bytes, mime_type: str, reader: str = "docai") -> ParsedReceipt:
+    """Read a receipt with Document AI (default) or the local LM Studio model.
+
+    Both save-and-replay by image hash: Document AI responses as `{hash}.json`, local
+    model JSON as `local-{hash}.json`. Downstream code never knows which reader ran.
+    """
+    if reader not in READERS:
+        raise ValueError(f"Unknown reader {reader!r}; expected one of {READERS}")
+    if reader == "local":
+        from backend import ocr_local  # imported here: ocr_local imports this module's exceptions
+
+        fixture = FIXTURES_DIR / f"local-{image_hash(image_bytes)}.json"
+        if fixture.exists():
+            log.info("Local OCR replay from %s", fixture.name)
+            data = json.loads(fixture.read_text())
+        elif os.getenv("OCR_MODE", "live") == "replay":
+            raise ReplayMissing("No saved response for this image (OCR_MODE=replay).")
+        else:
+            data = ocr_local.call_model(image_bytes, mime_type)
+            FIXTURES_DIR.mkdir(exist_ok=True)
+            fixture.write_text(json.dumps(data, indent=1))
+        return ocr_local.map_local_response(data)
+
     fixture = FIXTURES_DIR / f"{image_hash(image_bytes)}.json"
     if fixture.exists():
         log.info("OCR replay from %s", fixture.name)
