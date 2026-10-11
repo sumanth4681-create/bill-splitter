@@ -62,25 +62,25 @@ Build mode: learn (chosen by default on 2026-10-10; learner can switch to fast a
 ## Hands-on Checkpoints
 
 - [x] Early usable behavior explored — after slice 2 (claiming and the live split on a real receipt), while the editing and History slices can still change. Learner feedback 2026-10-10: no way to edit tax and tip → added tax/tip/receipt-total editing to slice 4.
-- [ ] Final kick-the-tires exploration and feedback completed
+- [x] Final kick-the-tires exploration and feedback completed — learner explored the running app across slices 2–5 (screenshots of claiming, editing, discount), asked for: tax/tip editing, totals always matching the receipt, a discount, a hardening pass, and an adversarial agent pass. All done.
 
 ## Final Review
 
 - [x] Hardening pass (learner request, 2026-10-10): upload size/type/real-image checks before any paid call; Streamlit bound to localhost; `pip-audit` clean; card/address/phone redacted from saved Google responses (and from `sample.json`); README security notes with the threat model and share-link requirements.
 - [x] Adversarial agent pass (2026-10-10): three subagents in parallel against a disposable target — API attacker (3 real findings: ints ≥ 2**63 → 500, no length caps, loose int coercion), security code review (10 findings; top one: saved Google responses embedded the receipt photo, so redaction was cosmetic), split/parser fuzzer (duplicate person ids double-counted; malformed model JSON crashed instead of "unreadable"; quadratic regex on hostile text; summary-label filter dropped real items like "Total Wine 750ml"). Every finding re-verified by the lead, fixed, and covered by a regression test: 44 → 59 tests.
-- [ ] Final review complete — feedback resolved and learner confirms ready to ship
+- [x] Final review complete — feedback resolved and learner confirmed "let's ship" on 2026-10-10. 59 tests pass; 11 commits; nothing private tracked.
 
 ## Code Tour and App Map
 
-- [ ] Learning activity complete — guided route, focused alternative, prior practice connected, or brief recap
-- [ ] Optional edit and transfer reflection addressed — offered/declined/already covered/not applicable as appropriate
-- [ ] `devpost/app-map.html` generated from finished code, checked, and shown, including a project-grounded practice to reuse
+- [x] Learning activity complete — prior practice connected (focused alternative for a plan-first learner): the learner's own goal was agent orchestration and context efficiency, and the hands-on practice happened during the build rather than as a separate exercise.
+- [ ] Optional edit and transfer reflection addressed — reflection question offered at wrap-up (2026-10-10); small edit not applicable (learner chose to test the running app rather than edit code)
+- [x] `devpost/app-map.html` generated from finished code (commit 8e15154), every named symbol checked against the source, no scripts, opened for the learner
 
-Activity and evidence: [what actually happened; real document/test/code references; unfinished work if interrupted]
-Route and stops: [actual paths and symbols; guided stops completed, or reference-only route]
-Edit outcome: [tried/kept/reverted/declined/not applicable; verification if changed]
-Reflection: [offered/answered/declined/already covered — personal answer belongs only in the ignored profile]
-Activity mode: [live app and editor, explicit static fallback, focused alternative, prior practice, or recap]
+Activity and evidence: Two real instances of delegation in this project: (1) `backend/split.py` + `tests/test_split.py` written by a subagent given only `spec.md > Split Logic` and `> Contracts` — 10/10 tests first run, two genuine contract gaps reported (receipt total missing from the signature; overrides type unstated), recorded under Revisions. (2) The adversarial pass requested by the learner: three parallel read-only subagents against a disposable target; findings re-verified by the lead and fixed with regression tests (44 → 59 passing). Takeaway delivered: narrow brief + no edit rights + independent verification; different vantage points find different bugs (the white-box reviewer found the embedded-photo fixture bug the black-box attacker could not).
+Route and stops: Reference-only route in the map (not toured live): `frontend/app.py` items_section/toggle_claim → `backend/main.py` put_claim + `backend/storage.py` set_claim → `backend/split.py` compute_split/fair_divide.
+Edit outcome: Not applicable — the learner's hands-on time went into testing the running app (screenshots at slices 2, 4, and the discount change) and directing revisions.
+Reflection: Offered ("What would you do differently next time you start with an agent?"); answer, if any, goes in the ignored profile.
+Activity mode: Prior practice connected, with the map as the take-home reference.
 
 ## Revisions
 

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bill Splitter App Map</title>
+<style>
+  :root { --bg:#F6F6F3; --panel:#ECECE7; --ink:#2A2A28; --accent:#5B7F75; --line:#C9C9C2; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1E1F1C; --panel:#2A2B27; --ink:#ECECE7; --accent:#8FB5AA; --line:#4A4B46; } }
+  body { margin:0; padding:24px 16px; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui, sans-serif; }
+  main { max-width:860px; margin:0 auto; }
+  h1 { font-size:1.6rem; margin:.2rem 0; } h2 { font-size:1.15rem; margin:1.6rem 0 .5rem; color:var(--accent); }
+  code, pre { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.92em; }
+  code { background:var(--panel); padding:.1em .35em; border-radius:4px; }
+  pre { background:var(--panel); padding:12px; border-radius:8px; overflow:auto; }
+  .stop { border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin:10px 0; background:var(--panel); }
+  .stop b { color:var(--accent); }
+  svg text { font:13px system-ui, sans-serif; fill:var(--ink); } svg .box { fill:var(--panel); stroke:var(--accent); stroke-width:1.5; }
+  svg .arrow { stroke:var(--accent); stroke-width:1.5; fill:none; marker-end:url(#a); } svg .store { stroke-dasharray:4 3; }
+  details { margin:.5rem 0; } summary { cursor:pointer; color:var(--accent); }
+  .muted { opacity:.75; font-size:.92em; }
+  table { border-collapse:collapse; width:100%; } td, th { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+</style>
+</head>
+<body>
+<main>
+<h1>Bill Splitter — App Map</h1>
+<p class="muted">Snapshot of commit <code>8e15154</code> on 2026-10-10. Code moves; if a path or name here no longer matches, search for the symbol name instead. Works offline, no scripts needed.</p>
+
+<h2>What it is</h2>
+<p>A local proof of concept: photograph a group receipt, let one person claim items on behalf of each friend, and see what everyone owes the payer. Shared items are split only among the people who had them; unclaimed items, tax, and tip are split across everyone; the amounts always add up to the receipt total.</p>
+<p>Four pieces, each with a fixed input and output shape:</p>
+<table>
+<tr><th>Piece</th><th>Where</th><th>Job</th></tr>
+<tr><td>Screen</td><td><code>bill-splitter/frontend/app.py</code></td><td>Streamlit tabs (Upload, History) and the bill view. No math, no storage; it only calls the API.</td></tr>
+<tr><td>Backend</td><td><code>bill-splitter/backend/main.py</code></td><td>FastAPI endpoints. Every change returns the full bill with a freshly computed summary.</td></tr>
+<tr><td>Readers</td><td><code>backend/ocr.py</code>, <code>backend/ocr_local.py</code></td><td>Google Document AI or a local LM Studio vision model, behind one function <code>read_receipt()</code>. Responses are saved by image hash and replayed for free.</td></tr>
+<tr><td>Split math</td><td><code>backend/split.py</code></td><td>Pure function <code>compute_split()</code>: items, people, claims in; each person's share out. Integer cents only.</td></tr>
+<tr><td>Storage</td><td><code>backend/storage.py</code></td><td>SQLite file <code>data/bills.db</code>: bills, items, people, claims.</td></tr>
+</table>
+
+<h2>One action, end to end: ticking an item for a person</h2>
+<svg viewBox="0 0 820 230" width="100%" role="img" aria-label="Flow of a claim click from the checkbox to the updated summary">
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--accent)"/></marker></defs>
+  <rect class="box" x="10" y="20" width="180" height="56" rx="8"/><text x="100" y="43" text-anchor="middle">Checkbox ticked</text><text x="100" y="62" text-anchor="middle" class="muted">app.py · toggle_claim</text>
+  <path class="arrow" d="M190,48 L240,48"/>
+  <rect class="box" x="240" y="20" width="190" height="56" rx="8"/><text x="335" y="43" text-anchor="middle">PUT /bills/{id}/claims</text><text x="335" y="62" text-anchor="middle" class="muted">main.py · put_claim</text>
+  <path class="arrow" d="M335,76 L335,120"/>
+  <rect class="box store" x="240" y="120" width="190" height="56" rx="8"/><text x="335" y="143" text-anchor="middle">claims table</text><text x="335" y="162" text-anchor="middle" class="muted">storage.py · set_claim</text>
+  <path class="arrow" d="M430,48 L500,48"/>
+  <rect class="box" x="500" y="20" width="190" height="56" rx="8"/><text x="595" y="43" text-anchor="middle">compute_split()</text><text x="595" y="62" text-anchor="middle" class="muted">split.py · pure math</text>
+  <path class="arrow" d="M595,76 L595,120"/>
+  <rect class="box" x="500" y="120" width="190" height="56" rx="8"/><text x="595" y="143" text-anchor="middle">BillDetail + summary</text><text x="595" y="162" text-anchor="middle" class="muted">name under item, totals update</text>
+  <path class="arrow" d="M500,148 L430,148" />
+  <text x="410" y="210" text-anchor="middle" class="muted">The response is the whole bill, so the screen re-renders from one object. Each click: about 1 ms on the backend.</text>
+</svg>
+
+<h2>Reference route (three stops)</h2>
+<p class="muted">Not toured live; the practice in this project went into the agent passes instead. Use it when you need to find where a behaviour lives.</p>
+<div class="stop"><b>1. Entry:</b> <code>bill-splitter/frontend/app.py</code> → <code>items_section()</code> draws one checkbox per item for the selected person; its <code>on_change</code> is <code>toggle_claim()</code>, which calls <code>api_client.set_claim()</code> and shows a toast.</div>
+<div class="stop"><b>2. Logic and storage:</b> <code>bill-splitter/backend/main.py</code> → <code>put_claim()</code> checks the item and person belong to this bill (404 otherwise), then <code>storage.set_claim()</code> inserts or deletes one row in <code>claims</code>. The summary is never stored: <code>_summary()</code> calls <code>split.compute_split()</code> on every response.</div>
+<div class="stop"><b>3. Result:</b> <code>bill-splitter/backend/split.py</code> → <code>compute_split()</code>. Rule by rule: a claimed item is divided among its claimers (<code>fair_divide</code> rotates leftover cents), an unclaimed item among everyone, tax and tip among everyone, a discount subtracted, and any gap to the receipt total shared as <code>difference_cents</code> so totals always equal what was paid.</div>
+
+<h2>To change this, start here</h2>
+<ul>
+<li><b>Split rules</b> (proportional tax, who gets the extra cent): <code>backend/split.py</code>, then run <code>tests/test_split.py</code>; the property test there must still pass.</li>
+<li><b>Which fields a reader returns</b> (quantity, discounts): <code>backend/ocr.py · map_expense_document()</code> for Google, <code>backend/ocr_local.py · map_local_response()</code> and <code>SYSTEM_PROMPT</code> for the local model. Saved responses in <code>backend/fixtures/</code> let you test without paying or waiting.</li>
+<li><b>Screen text and layout</b>: <code>frontend/app.py</code>; palette in <code>.streamlit/config.toml</code>.</li>
+<li><b>Limits</b> (upload size, max cents, name lengths): the constants at the top of <code>backend/main.py</code>.</li>
+<li><b>A new endpoint</b>: add the storage function, the Pydantic body model, the route in <code>main.py</code>, a wrapper in <code>frontend/api_client.py</code>, and a case in <code>tests/test_api.py</code>.</li>
+</ul>
+
+<h2>A practice to reuse</h2>
+<p><b>Give agents a narrow brief, no edit rights, and a disposable target; then re-verify every claim yourself.</b> In this project three subagents ran in parallel against a copy of the API on a scratch database: a black-box attacker, a white-box reviewer, and a fuzzer for the pure functions. The reviewer found the bug that mattered most (saved Google responses embedded the receipt photo, so the redaction in <code>ocr.strip_sensitive</code> was cosmetic); the fuzzer found parser crashes and a filter that dropped real items. Each finding was reproduced by hand before any fix, and each fix got a regression test (<code>tests/</code> grew from 44 to 59). The same pattern works on any codebase: different vantage points find different bugs, and verification, not trust, is what makes delegation safe.</p>
+<details><summary>Earlier instance of the same idea</summary><p><code>backend/split.py</code> and its tests were written by a subagent that saw only two spec sections (<i>Split Logic</i> and <i>Contracts</i> in <code>devpost/spec.md</code>). All tests passed first run, and the gaps it reported (the receipt total missing from the signature, an unstated overrides type) were exactly where the contract was silent.</p></details>
+
+<h2>Run it again</h2>
+<pre>cd bill-splitter
+source .venv/bin/activate
+uvicorn backend.main:app --port 8000        # terminal 1
+streamlit run frontend/app.py               # terminal 2 → http://localhost:8501
+python -m pytest -q                         # 59 tests, no network</pre>
+<p class="muted">Setup for the readers (Google key, LM Studio) is in <code>bill-splitter/README.md</code>. Reopen this map any time: <code>devpost/app-map.html</code>.</p>
+</main>
+</body>
+</html>
