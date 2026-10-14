@@ -133,3 +133,7 @@ def test_cross_site_browser_post_is_refused_but_local_tools_work(client):
                        headers={"Origin": "https://evil.example"})
     assert evil.status_code == 403
 
+def test_each_bill_gets_its_own_share_token(client):
+    a = upload(client).json()["share_token"]
+    b = upload(client).json()["share_token"]
+    assert len(a) ==22 and len(b) ==22 and a!=b

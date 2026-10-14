@@ -76,9 +76,11 @@ class BillDetail(BaseModel):
     created_at: str
     tax_cents: int
     tip_cents: int
+    share_token: str | None = None
     discount_cents: int = 0
     receipt_total_cents: int
     items: list[Item]
     people: list[Person]
     claims: list[Claim]
     summary: Summary
+

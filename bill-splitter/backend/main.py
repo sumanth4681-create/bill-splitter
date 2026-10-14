@@ -67,6 +67,7 @@ def _bill_detail(bill_id: int) -> BillDetail:
         id=bill["id"],
         name=bill["name"],
         created_at=bill["created_at"],
+        share_token=bill["share_token"],
         tax_cents=bill["tax_cents"],
         tip_cents=bill["tip_cents"],
         discount_cents=bill["discount_cents"],

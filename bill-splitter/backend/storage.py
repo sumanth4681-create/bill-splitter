@@ -1,5 +1,5 @@
 """SQLite storage for bills, items, people, and claims (data/bills.db)."""
-
+import secrets
 import os
 import sqlite3
 from datetime import datetime
@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS bills (
     tax_cents INTEGER NOT NULL DEFAULT 0,
     tip_cents INTEGER NOT NULL DEFAULT 0,
     discount_cents INTEGER NOT NULL DEFAULT 0,
+    share_token TEXT UNIQUE,
     receipt_total_cents INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS items (
@@ -63,6 +64,12 @@ def init_db() -> None:
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(bills)")}
         if "discount_cents" not in columns:
             conn.execute("ALTER TABLE bills ADD COLUMN discount_cents INTEGER NOT NULL DEFAULT 0")
+        if "share_token" not in columns:
+            conn.execute("ALTER TABLE bills ADD COLUMN share_token TEXT")
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS bill_share_token on bills(share_token)")
+            for row in conn.execute("SELECT id FROM bills WHERE share_token IS NULL").fetchall():
+                conn.execute("UPDATE bills SET share_token = ? WHERE id = ?", (secrets.token_urlsafe(16), row["id"]))
+
 
 
 def create_bill(parsed: ParsedReceipt, image_hash: str) -> int:
@@ -70,10 +77,11 @@ def create_bill(parsed: ParsedReceipt, image_hash: str) -> int:
     name = parsed.merchant or f"Bill – {now.date().isoformat()}"
     created_at = now.isoformat(timespec="seconds")
     with connect() as conn:
+        token=secrets.token_urlsafe(16)
         cur = conn.execute(
-            "INSERT INTO bills (name, created_at, image_hash, tax_cents, tip_cents, receipt_total_cents)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            (name, created_at, image_hash, parsed.tax_cents, parsed.tip_cents, parsed.total_cents),
+            "INSERT INTO bills (name, created_at, image_hash, tax_cents, tip_cents, receipt_total_cents,share_token)"
+            " VALUES (?, ?, ?, ?, ?, ?,?)",
+            (name, created_at, image_hash, parsed.tax_cents, parsed.tip_cents, parsed.total_cents,token),
         )
         bill_id = cur.lastrowid
         conn.executemany(
