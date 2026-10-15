@@ -153,9 +153,7 @@ def put_people(bill_id: PathId, body: PeopleIn) -> BillDetail:
     storage.replace_people(bill_id, body.names)
     return _bill_detail(bill_id)
 
-
-@app.put("/bills/{bill_id}/claims", response_model=BillDetail)
-def put_claim(bill_id: PathId, body: ClaimIn) -> BillDetail:
+def _apply_claim(bill_id: int, body: ClaimIn) -> BillDetail:
     detail = _bill_detail(bill_id)
     if body.item_id not in {i.id for i in detail.items} or body.person_id not in {p.id for p in detail.people}:
         raise HTTPException(status_code=404, detail="That item or person isn't on this bill.")
@@ -164,6 +162,23 @@ def put_claim(bill_id: PathId, body: ClaimIn) -> BillDetail:
     except sqlite3.IntegrityError:  # the person or item was removed by a concurrent edit
         raise HTTPException(status_code=409, detail="That person or item was just removed. Reload the bill.")
     return _bill_detail(bill_id)
+
+
+@app.put("/bills/{bill_id}/claims", response_model=BillDetail)
+def put_claim(bill_id: PathId, body: ClaimIn) -> BillDetail:
+    return _apply_claim(bill_id, body)
+
+
+@app.put("/share/{token}/claims", response_model=BillDetail)
+def put_shared_claim(token: Annotated[str, Path(max_length=64)], body: ClaimIn) -> BillDetail:
+    bill_id = storage.bill_id_for_token(token)
+    if bill_id is None:
+        raise HTTPException(status_code=404, detail="No bill found for that token.")
+    return _apply_claim(bill_id, body)
+
+
+
+
 
 
 class BillIn(BaseModel):

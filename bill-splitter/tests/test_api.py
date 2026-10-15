@@ -143,3 +143,14 @@ def test_share_link_opens_the_bill_and_bad_tokens_404(client):
     opened = client.get(f"/share/{bill['share_token']}").json()
     assert opened["id"] == bill["id"] and opened["items"] == bill["items"]
     assert client.get("/share/not-a-real-token").status_code == 404
+
+def test_friend_can_claim_through_the_link(client):
+    bill = upload(client).json()
+    token, bid = bill["share_token"], bill["id"]
+    people = client.put(f"/bills/{bid}/people", json={"names": ["Sam", "Alex"]}).json()["people"]
+    item = bill["items"][0]["id"]
+    body = {"item_id": item, "person_id": people[1]["id"], "claimed": True}
+    shared = client.put(f"/share/{token}/claims", json=body).json()
+    assert {"item_id": item, "person_id": people[1]["id"]} in shared["claims"]
+    assert client.get(f"/bills/{bid}").json()["claims"] == shared["claims"]   # payer sees it too
+    assert client.put("/share/not-a-real-token/claims", json=body).status_code == 404
