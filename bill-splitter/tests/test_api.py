@@ -137,3 +137,9 @@ def test_each_bill_gets_its_own_share_token(client):
     a = upload(client).json()["share_token"]
     b = upload(client).json()["share_token"]
     assert len(a) ==22 and len(b) ==22 and a!=b
+
+def test_share_link_opens_the_bill_and_bad_tokens_404(client):
+    bill = upload(client).json()
+    opened = client.get(f"/share/{bill['share_token']}").json()
+    assert opened["id"] == bill["id"] and opened["items"] == bill["items"]
+    assert client.get("/share/not-a-real-token").status_code == 404

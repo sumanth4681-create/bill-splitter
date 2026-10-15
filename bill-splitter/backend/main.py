@@ -123,6 +123,14 @@ def create_bill(request: Request, image: UploadFile = File(...), reader: str = F
 def list_bills() -> list[BillListItem]:
     return [BillListItem(**row) for row in storage.list_bills()]
 
+@app.get("/share/{token}", response_model=BillDetail)
+def get_shared_bill(token: Annotated[str, Path(max_length=64)]) ->BillDetail:
+    bill_id = storage.bill_id_for_token(token)
+    if bill_id is None:
+        raise HTTPException(status_code=404, detail="No bill found for that token.")
+    return _bill_detail(bill_id)
+
+
 
 @app.get("/bills/{bill_id}", response_model=BillDetail)
 def get_bill(bill_id: PathId) -> BillDetail:

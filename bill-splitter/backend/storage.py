@@ -90,7 +90,10 @@ def create_bill(parsed: ParsedReceipt, image_hash: str) -> int:
         )
     return bill_id
 
-
+def bill_id_for_token(token: str)-> int | None:
+    with connect() as conn:
+        row = conn.execute("SELECT id from bills where share_token=?",(token,)).fetchone()
+        return row["id"] if row else None
 def get_bill_rows(bill_id: int) -> dict | None:
     """Raw rows for one bill, or None if it doesn't exist."""
     with connect() as conn:
