@@ -133,3 +133,24 @@ def test_cross_site_browser_post_is_refused_but_local_tools_work(client):
                        headers={"Origin": "https://evil.example"})
     assert evil.status_code == 403
 
+def test_each_bill_gets_its_own_share_token(client):
+    a = upload(client).json()["share_token"]
+    b = upload(client).json()["share_token"]
+    assert len(a) ==22 and len(b) ==22 and a!=b
+
+def test_share_link_opens_the_bill_and_bad_tokens_404(client):
+    bill = upload(client).json()
+    opened = client.get(f"/share/{bill['share_token']}").json()
+    assert opened["id"] == bill["id"] and opened["items"] == bill["items"]
+    assert client.get("/share/not-a-real-token").status_code == 404
+
+def test_friend_can_claim_through_the_link(client):
+    bill = upload(client).json()
+    token, bid = bill["share_token"], bill["id"]
+    people = client.put(f"/bills/{bid}/people", json={"names": ["Sam", "Alex"]}).json()["people"]
+    item = bill["items"][0]["id"]
+    body = {"item_id": item, "person_id": people[1]["id"], "claimed": True}
+    shared = client.put(f"/share/{token}/claims", json=body).json()
+    assert {"item_id": item, "person_id": people[1]["id"]} in shared["claims"]
+    assert client.get(f"/bills/{bid}").json()["claims"] == shared["claims"]   # payer sees it too
+    assert client.put("/share/not-a-real-token/claims", json=body).status_code == 404

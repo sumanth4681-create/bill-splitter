@@ -58,9 +58,28 @@ streamlit run frontend/app.py             # screen; opens http://localhost:8501
 ```
 
 Then: **Upload** a receipt photo (JPEG/PNG), pick a reader, add your friends' names, choose a
-person and tick what they had, and read **Who owes what**. Fix any misread row with the ✎
+person and tick what they had (or send them the share link, below), and read **Who owes what**. Fix any misread row with the ✎
 pencil; tax, tip, discount, and the receipt total are editable under the items. **History**
 reopens past bills with their claims.
+
+## Share with the table
+
+Every bill has an unguessable share link. On the payer's bill, expand **Share with the table**
+to see the link and a QR code. A friend who opens it on their phone gets a cut-down page: pick
+your name, tick what you had, see what you owe. Their ticks appear on the payer's screen.
+
+The friend's phone has to be able to reach your Mac:
+
+- **Same Wi-Fi:** `streamlit run frontend/app.py --server.address 0.0.0.0` and set `APP_URL` in
+  `.env` to `http://<your-mac-ip>:8501` (`ipconfig getifaddr en0`). Many campus, office, and
+  apartment networks block devices from seeing each other; if the phone gets "connection failed",
+  use the tunnel or your phone's hotspot.
+- **Anywhere, via a tunnel:** `scripts/share.sh` starts ngrok and the screen together and prints
+  the public address. Anyone with the address can reach the whole app while it runs, so stop it
+  (Ctrl-C) when you're done.
+
+Known limit: the link identifies the bill, not the person, so anyone with it can pick any name.
+Per-person links are the natural next step. Approval rounds from the original design are not built.
 
 ## Tests
 
@@ -70,7 +89,7 @@ python -m pytest -q
 
 No network or database needed: the split rules (including a property test that the shares
 always sum to what was paid), both readers' mapping code on saved responses, and every endpoint
-through FastAPI's TestClient in replay mode.
+through FastAPI's TestClient in replay mode, plus the friend's page under Streamlit's AppTest.
 
 ## Comparing the readers
 

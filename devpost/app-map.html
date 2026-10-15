@@ -61,6 +61,9 @@
 <div class="stop"><b>2. Logic and storage:</b> <code>bill-splitter/backend/main.py</code> → <code>put_claim()</code> checks the item and person belong to this bill (404 otherwise), then <code>storage.set_claim()</code> inserts or deletes one row in <code>claims</code>. The summary is never stored: <code>_summary()</code> calls <code>split.compute_split()</code> on every response.</div>
 <div class="stop"><b>3. Result:</b> <code>bill-splitter/backend/split.py</code> → <code>compute_split()</code>. Rule by rule: a claimed item is divided among its claimers (<code>fair_divide</code> rotates leftover cents), an unclaimed item among everyone, tax and tip among everyone, a discount subtracted, and any gap to the receipt total shared as <code>difference_cents</code> so totals always equal what was paid.</div>
 
+<h2>Added after the first snapshot: the share link</h2>
+<p>A friend's door into the same bill. <code>backend/storage.py · bill_id_for_token()</code> turns the link's token into a bill id; <code>backend/main.py · get_shared_bill / put_shared_claim</code> serve the bill and accept ticks through <code>_apply_claim</code>, the same code the payer's route uses; <code>frontend/app.py · shared_page()</code> is the phone page and <code>share_section()</code> draws the link and QR code. Written by the project owner with review; tests in <code>tests/test_api.py</code> and <code>tests/test_share_page.py</code>.</p>
+
 <h2>To change this, start here</h2>
 <ul>
 <li><b>Split rules</b> (proportional tax, who gets the extra cent): <code>backend/split.py</code>, then run <code>tests/test_split.py</code>; the property test there must still pass.</li>

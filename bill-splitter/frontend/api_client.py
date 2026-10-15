@@ -73,3 +73,12 @@ def update_item(bill_id: int, item_id: int, **fields) -> dict:
 
 def set_override(bill_id: int, person_id: int, amount_cents: int | None) -> dict:
     return _request("PUT", f"/bills/{bill_id}/overrides", json={"person_id": person_id, "amount_cents": amount_cents})
+
+
+def get_shared_bill(token: str) -> dict:
+    return _request("GET", f"/share/{token}")
+
+
+def set_shared_claim(token: str, item_id: int, person_id: int, claimed: bool) -> dict:
+    return _request("PUT", f"/share/{token}/claims",
+                    json={"item_id": item_id, "person_id": person_id, "claimed": claimed})

@@ -1,5 +1,6 @@
 """Streamlit screen: Upload and History tabs, plus the bill view. No math, no storage."""
 
+import os
 import sys
 from pathlib import Path
 
@@ -10,6 +11,20 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 load_dotenv()
 
 from frontend import api_client  # noqa: E402
+
+def share_section(bill: dict) -> None:
+    import io
+
+    import qrcode
+
+    app_url = os.getenv("APP_URL", "http://localhost:8501").rstrip("/")
+    link = f"{app_url}/?share={bill['share_token']}"
+    with st.expander("Share with the table"):
+        st.code(link, language=None)
+        png = io.BytesIO()
+        qrcode.make(link).save(png, format="PNG")
+        st.image(png.getvalue(), width=180, caption="Scan to open this bill")
+
 
 st.set_page_config(page_title="Bill Splitter", page_icon="🧾", layout="centered")
 
@@ -225,11 +240,44 @@ def items_section(bill: dict, person: dict | None) -> None:
         money_input("Receipt total", f"receipt_total_cents_{bill['id']}", bill["receipt_total_cents"], save_amounts,
                     (bill["id"],), min_value=0.0)
 
+def toggle_shared_claim(token: str, item_id: int, person_id: int) -> None:
+    claimed = st.session_state[f"shared_{item_id}_{person_id}"]
+    _call(lambda: api_client.set_shared_claim(token, item_id, person_id, claimed),
+          "Claimed" if claimed else "Unclaimed")
+
+
+def shared_page(token: str) -> None:
+    try:
+        bill = api_client.get_shared_bill(token)
+    except (api_client.BackendUnavailable, api_client.ApiError) as exc:
+        show_error(exc)
+        return
+    st.subheader(bill["name"])
+    if not bill["people"]:
+        st.info("The payer hasn't added names yet. Ask them to add yours.")
+        return
+    names = [p["name"] for p in bill["people"]]
+    chosen = st.selectbox("I am", names, key="shared_me")
+    me = next(p for p in bill["people"] if p["name"] == chosen)
+    mine = {c["item_id"] for c in bill["claims"] if c["person_id"] == me["id"]}
+    st.markdown("**Tick what you had**")
+    for item in bill["items"]:
+        key = f"shared_{item['id']}_{me['id']}"
+        st.session_state[key] = item["id"] in mine
+        st.checkbox(f"{md_escape(item['name'])}  ·  {money(item['price_cents'])}", key=key,
+                    on_change=toggle_shared_claim, args=(token, item["id"], me["id"]))
+    share = next((s for s in bill["summary"]["people"] if s["person_id"] == me["id"]), None)
+    if share:
+        st.metric("You owe", money(share["final_cents"]))
+
+
+
 
 def show_bill(bill: dict) -> None:
     st.session_state[f"name_{bill['id']}"] = bill["name"]
     st.text_input("Bill name", key=f"name_{bill['id']}", on_change=save_bill_name, args=(bill["id"],))
     st.caption(f"Receipt total {money(bill['receipt_total_cents'])}")
+    share_section(bill)
     flash = st.session_state.pop("flash_error", None)
     if flash:
         st.error(flash)
@@ -279,6 +327,11 @@ def history_tab() -> None:
 
 
 st.title("Bill Splitter")
+token = st.query_params.get("share")
+if token:
+    shared_page(token)
+    st.stop()
+
 upload, history = st.tabs(["Upload", "History"])
 with upload:
     upload_tab()
